@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     # --- Ethereum (Sepolia testnet by default — NEVER default to mainnet) ---
-    rpc_url: str = "https://rpc.sepolia.org"
+    rpc_url: str = "https://ethereum-sepolia-rpc.publicnode.com"
     chain_id: int = 11155111  # Sepolia
     # Path to the agent's throwaway keystore. Testnet only.
     keystore_path: str = "wallet.key"
