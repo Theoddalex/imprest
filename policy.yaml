@@ -24,6 +24,11 @@ default:
       hourly_max: 50
       daily_max: 100
       approval_threshold: 20
+      # Cap on the TOTAL of live token allowances (approve()) across all
+      # spenders. Allowances outlive budget windows, so they get their own
+      # standing-liability cap. If unset, daily_max is used. approve(x, 0)
+      # revokes and frees the cap.
+      max_outstanding_allowance: 50
 
 agents:
   # a cautious identity: tiny budget, everything above 0.005 needs a human
@@ -37,6 +42,7 @@ agents:
         hourly_max: 10
         daily_max: 20
         approval_threshold: 5
+        max_outstanding_allowance: 10
 
   # a trusted identity: bigger budget
   procurement:

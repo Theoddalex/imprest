@@ -212,6 +212,37 @@ class AuditLog:
                 rows = self._conn.execute(select + " ORDER BY id").fetchall()
         return [dict(zip(cols, r)) for r in rows]
 
+    def outstanding_allowances(
+        self, agent_id: str
+    ) -> list[tuple[str, Decimal, str]]:
+        """(spender, amount, asset) for every LIVE allowance this agent granted.
+
+        The allowance ledger. ERC-20 approve() OVERWRITES the previous value,
+        so the live allowance to a spender is the amount of the LATEST approve
+        that counts — decision='allow' (granted, or human-approved) and not
+        failed (a failed broadcast leaves the previous on-chain value intact,
+        which is why failed rows are skipped rather than treated as zero).
+        Deliberately NOT time-bounded: an allowance never expires with a budget
+        window. A latest value of 0 (a revoke) drops the spender entirely.
+
+        v1 is conservative: it assumes the full last-approved amount is still
+        live (the spender may have already pulled some or all of it — that
+        would only mean the real liability is lower than what we cap).
+        """
+        sql = ("SELECT recipient, amount, asset FROM audit "
+               "WHERE agent_id = ? AND operation = 'approve' "
+               "AND decision = 'allow' AND status != 'failed' ORDER BY id")
+        with self._lock:
+            rows = self._conn.execute(sql, (agent_id,)).fetchall()
+        latest: dict[tuple[str, str], Decimal] = {}
+        for recipient, amount, asset in rows:
+            latest[(asset, recipient.lower())] = Decimal(amount)
+        return [
+            (spender, amount, asset)
+            for (asset, spender), amount in latest.items()
+            if amount != 0
+        ]
+
     def approved_spends(
         self, agent_id: str, since: datetime | None = None
     ) -> list[tuple[str, Decimal, datetime, str]]:

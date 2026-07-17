@@ -30,7 +30,10 @@ Agent: "pay 50 USDC to 0xabc… for the data API"
 
 Payments can move **ETH or ERC-20 tokens (USDC)**, and agents can `request_payment`
 or `request_approval` (a guarded token allowance — capped to an exact amount,
-never unlimited). A `needs_approval` verdict is no longer a dead end: it queues
+never unlimited). Granted allowances are tracked in an **allowance ledger**: they
+outlive budget windows, so the *total* an agent has live at once is capped too
+(`max_outstanding_allowance`), and `approve(spender, 0)` revokes to free the cap.
+A `needs_approval` verdict is no longer a dead end: it queues
 for a human operator, who approves or rejects it (`resolve_approval`) — and hard
 limits are re-checked at approval time, so a human "yes" can't bust a budget.
 
@@ -48,8 +51,8 @@ the same server.
   ceiling — and a token is payable only if the policy names it.
 - **The policy engine is pure logic** (`src/agentpay/services/policy.py`) — no
   I/O — so it is exhaustively unit-tested. The code guarding money is the code
-  under the most tests (74 across the engine, auth, audit, ERC-20, approval
-  flow, and payment flow).
+  under the most tests (103 across the engine, auth, audit, ERC-20, approvals,
+  the allowance ledger, and the payment flow).
 - **Config, not code.** Limits live in `policy.yaml`.
 
 ## Layout
@@ -69,7 +72,7 @@ src/agentpay/
 │   └── wallet.py                # throwaway testnet key
 ├── schemas/schemas.py           # contracts (Decimal money, dataclasses)
 └── configs/base.py              # pydantic settings
-tests/                           # 74 tests — policy, auth, audit, ERC-20, approvals, flow
+tests/                           # 103 tests — policy, auth, audit, ERC-20, approvals, allowances
 examples/demo_agent.py           # a LangChain agent that uses the server
 ```
 
@@ -137,22 +140,24 @@ audit log — it only gets `request_payment` and a verdict.
 ## Status
 
 Working v1: pure policy engine, per-agent + per-asset policies, guarded token
-`approve()`, a human approval-completion flow (admin-gated, budget re-checked at
-approval time), Bearer-key auth, append-only audit log, structured logging, real
-Base Sepolia sends of **ETH and USDC**, stdio + hosted HTTP transports, and a
-LangChain demo agent. 86 tests.
+`approve()` with an **allowance ledger** (total live allowances capped as a
+standing liability, revoke supported), a human approval-completion flow
+(admin-gated, budget + ledger re-checked at approval time), Bearer-key auth,
+append-only audit log, structured logging, real Base Sepolia sends of **ETH and
+USDC**, stdio + hosted HTTP transports, and a LangChain demo agent. 103 tests.
 
 ## Known limitations (testnet-first — read before mainnet)
 
 These are deliberate boundaries of the current design, verified by a `/ship`
 review. None risks testnet funds; all are gated before real money.
 
-- **Allowances are budgeted per rolling window, not as a standing liability.**
-  A guarded `approve()` counts against the same 24h budget as a transfer, but an
-  ERC-20 allowance is a *standing* on-chain grant that outlives the window — so
-  across days an agent could accumulate live allowances beyond any single-window
-  cap. Today: only grant approvals to spenders you trust, and prefer transfers.
-  **Hard gate before mainnet** (see roadmap: allowance ledger).
+- **The allowance ledger is conservative and off-chain.** It assumes the full
+  last-approved amount to each spender is still live (a spender may have already
+  pulled some — the real liability can only be *lower* than what we cap), and it
+  reconstructs the ledger from agentpay's own audit log: allowances granted
+  outside agentpay (or before it) are invisible to it. Start from a wallet with
+  no pre-existing approvals, or revoke them first. On-chain `allowance()`
+  reconciliation is on the roadmap.
 - **Rate limiting counts only allowed spends.** Denied and `needs_approval`
   attempts don't count toward `rate_limit_per_minute`, and the pending-approval
   queue is unbounded/unpaginated — a looping agent can flood the audit log.
@@ -173,9 +178,9 @@ review. None risks testnet funds; all are gated before real money.
 
 ## Roadmap
 
-- **Allowance ledger (mainnet gate).** Track outstanding ERC-20 allowances as a
-  first-class, non-expiring liability with its own cap (per asset+spender,
-  net-new delta on re-approve) — closes the cross-window accumulation above.
+- **On-chain allowance reconciliation.** Cross-check the ledger against live
+  `allowance()` reads so spent-down grants free the cap, and pre-existing
+  out-of-band approvals are detected instead of invisible.
 - **Postgres audit backend.** Replaces the SQLite file — unlocks multi-replica
   deployment *and* cross-process budget atomicity (`SELECT … FOR UPDATE`),
   lifting the single-process limitation above. One swap, both wins.

@@ -17,6 +17,7 @@ from decimal import Decimal
 import yaml
 
 from agentpay.schemas.schemas import (
+    AllowanceRecord,
     AssetLimits,
     Decision,
     PaymentRequest,
@@ -27,11 +28,15 @@ from agentpay.schemas.schemas import (
 
 
 def _asset_limits_from_dict(raw: dict) -> AssetLimits:
+    outstanding = raw.get("max_outstanding_allowance")
     return AssetLimits(
         per_transaction_max=Decimal(str(raw["per_transaction_max"])),
         daily_max=Decimal(str(raw["daily_max"])),
         hourly_max=Decimal(str(raw["hourly_max"])),
         approval_threshold=Decimal(str(raw["approval_threshold"])),
+        max_outstanding_allowance=(
+            Decimal(str(outstanding)) if outstanding is not None else None
+        ),
     )
 
 
@@ -114,11 +119,19 @@ class PolicyEngine:
         request: PaymentRequest,
         history: list[SpendRecord],
         now: datetime,
+        allowances: list[AllowanceRecord] | None = None,
     ) -> PolicyDecision:
+        """Judge a request against the policy.
+
+        `history` is the budget-window spend record (rolling caps); `allowances`
+        is the ledger of LIVE token allowances this agent has granted — needed
+        only for operation='approve', where the standing-liability cap applies.
+        """
         p = self.policy
         recipient = request.recipient.lower()
         amount = request.amount
         asset = request.asset
+        is_approve = request.operation == "approve"
 
         # 1. Denylist — absolute, overrides everything else.
         if recipient in p.denylist:
@@ -134,8 +147,9 @@ class PolicyEngine:
                 "allowlist",
             )
 
-        # 3. Sanity: no zero/negative payments.
-        if amount <= 0:
+        # 3. Sanity: no zero/negative payments. Exception: approve(spender, 0)
+        #    is the standard ERC-20 REVOKE — it reduces risk, so it is allowed.
+        if amount < 0 or (amount == 0 and not is_approve):
             return PolicyDecision(
                 Decision.DENY, f"amount {amount} must be positive", "amount_positive"
             )
@@ -164,7 +178,29 @@ class PolicyEngine:
                 "per_transaction_max",
             )
 
-        # 6. Rolling 1-hour spend cap.
+        # 6. Outstanding-allowance cap (approve only). Budgets reset with their
+        #    window; an allowance does NOT — it stays live until spent or
+        #    revoked, so across days an agent could stack live allowances far
+        #    beyond any one window's budget. This caps the TOTAL an agent has
+        #    live at once. approve() overwrites, so this spender's previous
+        #    grant is REPLACED by (not added to) the new amount; approving 0
+        #    (revoke) always passes and frees the cap.
+        if is_approve:
+            others = sum(
+                (a.amount for a in (allowances or [])
+                 if a.asset == asset and a.spender.lower() != recipient),
+                start=Decimal(0),
+            )
+            cap = limits.outstanding_allowance_cap
+            if others + amount > cap:
+                return PolicyDecision(
+                    Decision.DENY,
+                    f"total live {asset} allowances {others}+{amount} would "
+                    f"exceed the outstanding cap {cap}",
+                    "max_outstanding_allowance",
+                )
+
+        # 7. Rolling 1-hour spend cap.
         hour_spent = self._spent_since(asset_history, now - timedelta(hours=1))
         if hour_spent + amount > limits.hourly_max:
             return PolicyDecision(
@@ -174,7 +210,7 @@ class PolicyEngine:
                 "hourly_max",
             )
 
-        # 7. Rolling 24-hour spend cap.
+        # 8. Rolling 24-hour spend cap.
         day_spent = self._spent_since(asset_history, now - timedelta(hours=24))
         if day_spent + amount > limits.daily_max:
             return PolicyDecision(
@@ -184,7 +220,7 @@ class PolicyEngine:
                 "daily_max",
             )
 
-        # 8. Rate limit — count ALL payments in the last 60 seconds, any asset.
+        # 9. Rate limit — count ALL payments in the last 60 seconds, any asset.
         #    (A flood is a flood regardless of which token it moves.)
         recent = self._count_since(history, now - timedelta(seconds=60))
         if recent >= p.rate_limit_per_minute:
@@ -195,7 +231,7 @@ class PolicyEngine:
                 "rate_limit_per_minute",
             )
 
-        # 9. Above the approval threshold → allowed, but a human must confirm.
+        # 10. Above the approval threshold → allowed, but a human must confirm.
         if amount > limits.approval_threshold:
             return PolicyDecision(
                 Decision.NEEDS_APPROVAL,
@@ -204,7 +240,7 @@ class PolicyEngine:
                 "approval_threshold",
             )
 
-        # 10. All checks passed.
+        # 11. All checks passed.
         return PolicyDecision(Decision.ALLOW, "within policy", "ok")
 
     @staticmethod

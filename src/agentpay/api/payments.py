@@ -20,7 +20,12 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 
-from agentpay.schemas.schemas import Decision, PaymentRequest, SpendRecord
+from agentpay.schemas.schemas import (
+    AllowanceRecord,
+    Decision,
+    PaymentRequest,
+    SpendRecord,
+)
 from agentpay.services.audit import AuditLog
 from agentpay.services.auth import current_agent_id, current_is_admin
 from agentpay.services.chain import _to_base_units
@@ -79,6 +84,13 @@ def register_payment_tools(
         return chain.send_erc20(
             token.address, request.recipient, request.amount, token.decimals
         )
+
+    def _live_allowances(agent_id: str) -> list[AllowanceRecord]:
+        """The agent's live token allowances (the standing-liability ledger)."""
+        return [
+            AllowanceRecord(spender=s, amount=a, asset=ast)
+            for (s, a, ast) in audit.outstanding_allowances(agent_id)
+        ]
 
     def _process(operation: str, recipient: str, amount, reason: str, asset: str) -> dict:
         """The shared money path for both transfers and approvals.
@@ -154,8 +166,11 @@ def register_payment_tools(
                     agent_id, since=now - _BUDGET_WINDOW
                 )
             ]
+            # An approve is judged against the allowance ledger too: the total
+            # of LIVE allowances (which outlive budget windows) stays capped.
+            allowances = _live_allowances(agent_id) if operation == "approve" else []
             engine = PolicyEngine(store.for_agent(agent_id))
-            decision = engine.evaluate(request, history, now)
+            decision = engine.evaluate(request, history, now, allowances)
 
             # 2. Record the attempt BEFORE any send, so nothing goes unlogged.
             row_id = audit.record(request, decision, now)
@@ -220,11 +235,15 @@ def register_payment_tools(
 
         agentpay approves an EXACT amount only — never an unlimited allowance,
         the vector behind most token drains. The allowance is capped by, and
-        counts against, the same per-asset limits as a direct payment.
+        counts against, the same per-asset limits as a direct payment, and the
+        TOTAL of live allowances across all spenders is itself capped (an
+        allowance outlives budget windows, so it is tracked as a standing
+        liability). Approving 0 revokes the spender's allowance and frees cap.
 
         Args:
             spender: the 0x address being granted the allowance
-            amount: the allowance, in whole units of `asset` (e.g. 25 for 25 USDC)
+            amount: the allowance, in whole units of `asset` (e.g. 25 for
+                    25 USDC); 0 revokes this spender's existing allowance
             asset: the token symbol (e.g. "USDC"); native ETH cannot be approved
             reason: what the approval is for (recorded in the audit log)
         """
@@ -293,8 +312,12 @@ def register_payment_tools(
                     agent_id, since=now - _BUDGET_WINDOW
                 )
             ]
+            allowances = (
+                _live_allowances(agent_id)
+                if request.operation == "approve" else []
+            )
             recheck = PolicyEngine(store.for_agent(agent_id)).evaluate(
-                request, history, now
+                request, history, now, allowances
             )
             if recheck.decision is Decision.DENY:
                 # A hard limit now blocks it; the human ok cannot override that.

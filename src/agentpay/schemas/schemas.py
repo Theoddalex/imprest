@@ -44,6 +44,21 @@ class SpendRecord:
 
 
 @dataclass(frozen=True)
+class AllowanceRecord:
+    """A live ERC-20 allowance this agent has granted — a standing liability.
+
+    Unlike a SpendRecord, an allowance does not expire with a budget window:
+    the spender can pull the funds at any point until it is spent or revoked.
+    Because ERC-20 approve() OVERWRITES (never adds), the live allowance to a
+    spender is simply the amount of the most recent successful approve to them.
+    """
+
+    spender: str
+    amount: Decimal
+    asset: str
+
+
+@dataclass(frozen=True)
 class PolicyDecision:
     """The engine's verdict. `reason` is human-readable and goes to the agent + audit log."""
 
@@ -71,6 +86,19 @@ class AssetLimits:
     daily_max: Decimal
     hourly_max: Decimal
     approval_threshold: Decimal
+    # Cap on the SUM of live allowances across all spenders for this asset.
+    # Budgets reset every window, but an allowance is a standing grant that
+    # outlives them — without this cap an agent could accumulate live
+    # allowances across days beyond any single-window budget. None means
+    # "not configured": the daily budget is used as the cap (safe default).
+    max_outstanding_allowance: Decimal | None = None
+
+    @property
+    def outstanding_allowance_cap(self) -> Decimal:
+        """The effective cap on total live allowances (falls back to daily_max)."""
+        if self.max_outstanding_allowance is not None:
+            return self.max_outstanding_allowance
+        return self.daily_max
 
 
 @dataclass
