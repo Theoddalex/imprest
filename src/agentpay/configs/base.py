@@ -28,5 +28,12 @@ class Settings(BaseSettings):
     # Even on testnet, the agent can't send until you opt in.
     enable_sends: bool = False
 
+    # --- Transport ---
+    # "stdio" for local spawn-per-client use; "streamable-http" to host the
+    # server at a URL that many clients/agents connect to (the org setup).
+    transport: str = "stdio"
+    host: str = "127.0.0.1"
+    port: int = 8000
+
 
 settings = Settings()

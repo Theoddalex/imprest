@@ -1,14 +1,10 @@
-"""Entrypoint — runs the agentpay MCP server over stdio.
+"""Repo-root shim — kept so `python main.py` still works from a clone.
 
-Thin, like the backend's main.py. All the wiring is in create_application().
-
-Run:  python main.py
-Or point any MCP client at:  {"command": "python", "args": ["main.py"]}
+The real entrypoint is the installed console script (`agentpay`), defined in
+src/agentpay/main.py. Transport (stdio vs streamable-http) comes from .env.
 """
 
-from src.application import create_application
-
-mcp = create_application()
+from agentpay.main import main
 
 if __name__ == "__main__":
-    mcp.run()  # stdio transport by default
+    main()

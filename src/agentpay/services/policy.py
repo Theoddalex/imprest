@@ -16,7 +16,7 @@ from decimal import Decimal
 
 import yaml
 
-from src.schemas.schemas import (
+from agentpay.schemas.schemas import (
     Decision,
     PaymentRequest,
     Policy,

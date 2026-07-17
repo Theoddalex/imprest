@@ -14,7 +14,7 @@ import sqlite3
 from datetime import datetime
 from decimal import Decimal
 
-from src.schemas.schemas import PaymentRequest, PolicyDecision
+from agentpay.schemas.schemas import PaymentRequest, PolicyDecision
 
 
 class AuditLog:

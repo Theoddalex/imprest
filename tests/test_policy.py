@@ -12,13 +12,13 @@ from decimal import Decimal
 
 import pytest
 
-from src.schemas.schemas import (
+from agentpay.schemas.schemas import (
     Decision,
     PaymentRequest,
     Policy,
     SpendRecord,
 )
-from src.services.policy import PolicyEngine
+from agentpay.services.policy import PolicyEngine
 
 NOW = datetime(2026, 7, 17, 12, 0, 0)
 ALICE = "0xAAAA000000000000000000000000000000000001"

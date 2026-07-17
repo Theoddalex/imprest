@@ -14,9 +14,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from src.schemas.schemas import Decision, PaymentRequest
-from src.services.audit import AuditLog
-from src.services.policy import PolicyEngine
+from agentpay.schemas.schemas import Decision, PaymentRequest
+from agentpay.services.audit import AuditLog
+from agentpay.services.policy import PolicyEngine
 
 
 def _now() -> datetime:
@@ -103,6 +103,6 @@ def register_payment_tools(
 
 
 def _spend_record(recipient: str, amount: Decimal, ts: datetime):
-    from src.schemas.schemas import SpendRecord
+    from agentpay.schemas.schemas import SpendRecord
 
     return SpendRecord(recipient=recipient, amount=amount, timestamp=ts)
