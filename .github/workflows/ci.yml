@@ -1,0 +1,71 @@
+# CI: prove the policy engine, then scan everything that could leak or drain.
+#
+#   tests   - pytest (the 103 tests guarding the money path)
+#   bandit  - SAST over src/ (our own code: key handling, auth, injection)
+#   trivy   - SCA (dependency CVEs) + secret scan (a committed wallet.key or
+#             API key must fail the build) + the Docker image
+
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - run: pytest -q
+
+  bandit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install bandit
+      - run: bandit -c pyproject.toml -r src
+
+  trivy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      # Trivy can't read pip deps from pyproject.toml — resolve the runtime
+      # deps and freeze them into a lockfile it understands, or the SCA part
+      # would silently scan nothing.
+      - name: Resolve runtime dependencies for scanning
+        run: |
+          pip install -e .
+          pip freeze --exclude-editable > requirements.txt
+      - name: Scan repo — dependency CVEs, secrets, misconfig
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image
+        run: docker build -t agentpay:ci .
+      - name: Scan the image — base OS + installed packages
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          image-ref: agentpay:ci
+          severity: HIGH,CRITICAL
+          exit-code: "1"

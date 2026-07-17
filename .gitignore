@@ -8,3 +8,6 @@ audit.db
 
 build/
 *.egg-info/
+
+# generated only for trivy dependency scanning (make trivy)
+requirements.txt

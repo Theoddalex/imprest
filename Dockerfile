@@ -23,5 +23,12 @@ RUN pip install --no-cache-dir .
 # default config: hosted transport, listen on all interfaces inside the container
 ENV TRANSPORT=streamable-http HOST=0.0.0.0 PORT=8000
 
+# never run the wallet-holding process as root: a container escape from a
+# non-root user is a much taller order, and nothing here needs privileges.
+# /app/data is where the mounted keystore + audit db live.
+RUN useradd --create-home --uid 10001 agentpay \
+    && mkdir -p /app/data && chown -R agentpay /app/data
+USER agentpay
+
 EXPOSE 8000
 CMD ["agentpay"]

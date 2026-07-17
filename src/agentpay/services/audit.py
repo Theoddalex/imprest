@@ -135,7 +135,8 @@ class AuditLog:
         """needs_approval rows still awaiting a human decision (status=recorded)."""
         cols = ["id", "ts", "agent_id", "recipient", "amount", "asset",
                 "operation", "detail"]
-        sql = (f"SELECT {', '.join(cols)} FROM audit "
+        # cols are hardcoded literals; every runtime value binds via ? params.
+        sql = (f"SELECT {', '.join(cols)} FROM audit "  # nosec B608
                "WHERE decision = 'needs_approval' AND status = 'recorded'")
         params: list = []
         if agent_id:
@@ -151,7 +152,8 @@ class AuditLog:
         cols = ["id", "agent_id", "recipient", "amount", "asset", "operation", "reason"]
         with self._lock:
             row = self._conn.execute(
-                f"SELECT {', '.join(cols)} FROM audit "
+                # cols are hardcoded literals; the id binds via the ? param.
+                f"SELECT {', '.join(cols)} FROM audit "  # nosec B608
                 "WHERE id = ? AND decision = 'needs_approval' AND status = 'recorded'",
                 (row_id,),
             ).fetchone()
@@ -202,7 +204,8 @@ class AuditLog:
         cols = ["ts", "agent_id", "recipient", "amount", "asset", "operation",
                 "decision", "rule", "detail", "status", "tx_hash", "error",
                 "approver"]
-        select = f"SELECT {', '.join(cols)} FROM audit"
+        # cols are hardcoded literals; agent_id binds via the ? param.
+        select = f"SELECT {', '.join(cols)} FROM audit"  # nosec B608
         with self._lock:
             if agent_id:
                 rows = self._conn.execute(

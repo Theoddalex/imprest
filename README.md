@@ -146,6 +146,20 @@ standing liability, revoke supported), a human approval-completion flow
 append-only audit log, structured logging, real Base Sepolia sends of **ETH and
 USDC**, stdio + hosted HTTP transports, and a LangChain demo agent. 103 tests.
 
+## Security checks
+
+Every push runs the app-sec pipeline (`.github/workflows/ci.yml`), mirrored
+locally by `make security`:
+
+- **bandit** — SAST over `src/` (the code handling keys, auth, and SQL)
+- **Trivy** — dependency CVEs (SCA), committed-secret scan (a `wallet.key` or
+  API key in a commit fails the build), Dockerfile misconfig, and the built
+  image (base OS + installed packages)
+
+All findings gate at HIGH/CRITICAL. agentpay deploys no custom smart
+contracts, so the risk surface is the application itself — these checks cover
+it; an external review is still the gate before real funds.
+
 ## Known limitations (testnet-first — read before mainnet)
 
 These are deliberate boundaries of the current design, verified by a `/ship`
