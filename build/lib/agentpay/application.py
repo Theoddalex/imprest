@@ -10,7 +10,7 @@ from __future__ import annotations
 from agentpay.api.payments import register_payment_tools
 from agentpay.configs.base import settings
 from agentpay.services.audit import AuditLog
-from agentpay.services.policy import PolicyStore
+from agentpay.services.policy import PolicyEngine, load_policy
 
 
 def create_application():
@@ -18,7 +18,7 @@ def create_application():
 
     mcp = FastMCP("agentpay")
 
-    store = PolicyStore.load(settings.policy_path)
+    engine = PolicyEngine(load_policy(settings.policy_path))
     audit = AuditLog(settings.audit_db_path)
 
     # Chain is built lazily: only construct web3/RPC when a tool actually needs it,
@@ -32,7 +32,7 @@ def create_application():
 
     register_payment_tools(
         mcp,
-        store,
+        engine,
         audit,
         get_chain=get_chain,
         enable_sends=settings.enable_sends,

@@ -79,18 +79,28 @@ The wallet owner runs the server; agents connect as clients and set nothing.
 {"agentpay": {"transport": "stdio", "command": "agentpay"}}
 ```
 
-**Hosted (HTTP)** — one server for the whole org; developers get a URL:
+**Hosted (HTTP)** — one server for the whole org; developers get a URL and an
+API key. The server **refuses to start without keys** (an open endpoint would
+mean anyone who can reach it can spend the budget):
 
 ```bash
-TRANSPORT=streamable-http agentpay          # bare metal
+TRANSPORT=streamable-http \
+AGENTPAY_API_KEYS='sk-supp-…:support-bot,sk-proc-…:procurement' agentpay
 # or
 docker build -t agentpay . && docker run -p 8000:8000 \
-  -v $(pwd)/policy.yaml:/app/policy.yaml agentpay
+  -e AGENTPAY_API_KEYS='…' -v $(pwd)/policy.yaml:/app/policy.yaml agentpay
 ```
 
 ```json
-{"agentpay": {"transport": "streamable_http", "url": "http://payments.internal:8000/mcp"}}
+{"agentpay": {"transport": "streamable_http",
+              "url": "http://payments.internal:8000/mcp",
+              "headers": {"Authorization": "Bearer sk-supp-…"}}}
 ```
+
+The API key is the agent's identity: it selects that agent's policy section in
+`policy.yaml` and attributes its audit trail. The same request can be denied
+for `support-bot` (0.01/tx cap) and allowed for `procurement` (0.05/tx) —
+identity decides. Unauthenticated requests get a 401 before any tool runs.
 
 Either way, the client's agent code never sees the policy, the keys, or the
 audit log — it only gets `request_payment` and a verdict.

@@ -1,15 +1,27 @@
-# agentpay spend policy — the guardrails the agent CANNOT override.
-# This is the product's config surface: change limits here, not in code.
-# All amounts are in ETH.
+# agentpay spend policy — the guardrails agents CANNOT override.
+# Amounts are in ETH. Limits are config, not code.
+#
+# `default` applies to every agent; entries under `agents` override only the
+# fields they specify, keyed by the authenticated agent id (from the API key
+# over HTTP, or AGENT_ID for local stdio use).
 
-per_transaction_max: 0.05      # reject any single payment larger than this
-hourly_max: 0.10               # reject if rolling 1-hour spend would exceed this
-daily_max: 0.20                # reject if rolling 24-hour spend would exceed this
-rate_limit_per_minute: 5       # at most this many payments in any 60-second window
-approval_threshold: 0.02       # payments above this are allowed only with human approval
+default:
+  per_transaction_max: 0.05    # reject any single payment larger than this
+  hourly_max: 0.10             # reject if rolling 1-hour spend would exceed this
+  daily_max: 0.20              # reject if rolling 24-hour spend would exceed this
+  rate_limit_per_minute: 5     # at most this many payments per 60s window
+  approval_threshold: 0.02     # above this, a human must approve
+  allowlist: []                # if non-empty, ONLY these recipients (lowercase)
+  denylist: []                 # never pay these, overrides everything
 
-# If allowlist is non-empty, ONLY these recipients may be paid (lowercased addresses).
-allowlist: []
+agents:
+  # a cautious identity: tiny budget, everything above 0.005 needs a human
+  support-bot:
+    per_transaction_max: 0.01
+    daily_max: 0.02
+    approval_threshold: 0.005
 
-# Never pay these, regardless of any other rule (lowercased addresses).
-denylist: []
+  # a trusted identity: bigger budget
+  procurement:
+    per_transaction_max: 0.05
+    daily_max: 0.20

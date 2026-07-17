@@ -89,12 +89,39 @@ examples/demo_agent.py      # a LangChain agent that uses the server
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -e ".[demo,dev]"
 cp .env.example .env
 
 pytest                 # prove the policy engine
-python main.py         # run the MCP server
+agentpay               # run the MCP server (stdio)
+python examples/demo_agent.py   # watch an agent get allowed / blocked / gated
 ```
+
+## Deploying it
+
+The wallet owner runs the server; agents connect as clients and set nothing.
+
+**Local (stdio)** — each MCP client spawns its own server process:
+
+```json
+{"agentpay": {"transport": "stdio", "command": "agentpay"}}
+```
+
+**Hosted (HTTP)** — one server for the whole org; developers get a URL:
+
+```bash
+TRANSPORT=streamable-http agentpay          # bare metal
+# or
+docker build -t agentpay . && docker run -p 8000:8000 \
+  -v $(pwd)/policy.yaml:/app/policy.yaml agentpay
+```
+
+```json
+{"agentpay": {"transport": "streamable_http", "url": "http://payments.internal:8000/mcp"}}
+```
+
+Either way, the client's agent code never sees the policy, the keys, or the
+audit log — it only gets `request_payment` and a verdict.
 
 ## Status
 

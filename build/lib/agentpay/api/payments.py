@@ -16,8 +16,7 @@ from decimal import Decimal
 
 from agentpay.schemas.schemas import Decision, PaymentRequest
 from agentpay.services.audit import AuditLog
-from agentpay.services.auth import current_agent_id
-from agentpay.services.policy import PolicyEngine, PolicyStore
+from agentpay.services.policy import PolicyEngine
 
 
 def _now() -> datetime:
@@ -26,7 +25,7 @@ def _now() -> datetime:
 
 def register_payment_tools(
     mcp,
-    store: PolicyStore,
+    engine: PolicyEngine,
     audit: AuditLog,
     get_chain=None,
     enable_sends: bool = False,
@@ -48,24 +47,19 @@ def register_payment_tools(
             amount: amount of ETH to send
             reason: what the payment is for (recorded in the audit log)
         """
-        # Identity comes from authentication (Bearer key over HTTP, or the
-        # configured local identity over stdio) — never from the agent's input,
-        # which could simply lie about who it is.
-        agent_id = current_agent_id.get()
         request = PaymentRequest(
-            agent_id=agent_id,
+            agent_id="demo-agent",
             recipient=recipient,
             amount=Decimal(str(amount)),
             reason=reason,
         )
         now = _now()
 
-        # 1. Reconstruct THIS agent's spend history and apply THIS agent's policy.
+        # 1. Reconstruct spend history from the audit log and ask the policy.
         history = [
             _spend_record(r, a, t)
-            for (r, a, t) in audit.approved_spends(agent_id)
+            for (r, a, t) in audit.approved_spends(request.agent_id)
         ]
-        engine = PolicyEngine(store.for_agent(agent_id))
         decision = engine.evaluate(request, history, now)
 
         # 2. Execute only if allowed outright AND sends are enabled.
@@ -105,7 +99,7 @@ def register_payment_tools(
     def get_audit_log() -> dict:
         """Return the full history of this agent's payment attempts and what the
         policy decided about each — approved, denied, or executed."""
-        return {"entries": audit.history(current_agent_id.get())}
+        return {"entries": audit.history("demo-agent")}
 
 
 def _spend_record(recipient: str, amount: Decimal, ts: datetime):

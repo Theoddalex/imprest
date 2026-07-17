@@ -35,14 +35,5 @@ class Settings(BaseSettings):
     host: str = "127.0.0.1"
     port: int = 8000
 
-    # --- Identity / auth ---
-    # HTTP: "key1:agent-a,key2:agent-b" — every request must present one of
-    # these as a Bearer token. Empty + HTTP transport = server refuses to start
-    # (set allow_anonymous=true to override, e.g. for local experiments).
-    agentpay_api_keys: str = ""
-    allow_anonymous: bool = False
-    # stdio: the identity of the local caller (the OS is the auth boundary).
-    agent_id: str = "local"
-
 
 settings = Settings()

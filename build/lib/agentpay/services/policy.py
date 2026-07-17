@@ -25,7 +25,11 @@ from agentpay.schemas.schemas import (
 )
 
 
-def _policy_from_dict(raw: dict) -> Policy:
+def load_policy(path: str) -> Policy:
+    """Read policy.yaml into a Policy. Addresses are normalised to lowercase."""
+    with open(path) as f:
+        raw = yaml.safe_load(f) or {}
+
     return Policy(
         per_transaction_max=Decimal(str(raw["per_transaction_max"])),
         daily_max=Decimal(str(raw["daily_max"])),
@@ -35,47 +39,6 @@ def _policy_from_dict(raw: dict) -> Policy:
         allowlist=[a.lower() for a in raw.get("allowlist", [])],
         denylist=[a.lower() for a in raw.get("denylist", [])],
     )
-
-
-def load_policy(path: str) -> Policy:
-    """Read a flat policy.yaml into a single Policy (the pre-identity format)."""
-    with open(path) as f:
-        raw = yaml.safe_load(f) or {}
-    return _policy_from_dict(raw)
-
-
-class PolicyStore:
-    """Per-agent policies with a default fallback.
-
-    policy.yaml, identity-aware format:
-
-        default:
-          per_transaction_max: 0.05
-          ...
-        agents:
-          support-bot:            # overrides only what differs from default
-            per_transaction_max: 0.01
-
-    A flat file (no `default:` key) is treated as the default for every agent,
-    so existing configs keep working unchanged.
-    """
-
-    def __init__(self, default: dict, agents: dict[str, dict]) -> None:
-        self._default = default
-        self._agents = agents
-
-    @classmethod
-    def load(cls, path: str) -> "PolicyStore":
-        with open(path) as f:
-            raw = yaml.safe_load(f) or {}
-        if "default" in raw:
-            return cls(raw["default"], raw.get("agents") or {})
-        return cls(raw, {})  # flat legacy format
-
-    def for_agent(self, agent_id: str) -> Policy:
-        merged = dict(self._default)
-        merged.update(self._agents.get(agent_id, {}))
-        return _policy_from_dict(merged)
 
 
 class PolicyEngine:
