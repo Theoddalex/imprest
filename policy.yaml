@@ -1,0 +1,15 @@
+# agentpay spend policy — the guardrails the agent CANNOT override.
+# This is the product's config surface: change limits here, not in code.
+# All amounts are in ETH.
+
+per_transaction_max: 0.05      # reject any single payment larger than this
+hourly_max: 0.10               # reject if rolling 1-hour spend would exceed this
+daily_max: 0.20                # reject if rolling 24-hour spend would exceed this
+rate_limit_per_minute: 5       # at most this many payments in any 60-second window
+approval_threshold: 0.02       # payments above this are allowed only with human approval
+
+# If allowlist is non-empty, ONLY these recipients may be paid (lowercased addresses).
+allowlist: []
+
+# Never pay these, regardless of any other rule (lowercased addresses).
+denylist: []
