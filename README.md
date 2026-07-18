@@ -87,6 +87,16 @@ A `needs_approval` verdict is not a dead end: it queues for a human operator,
 who approves or rejects (`resolve_approval`) — and hard limits are re-checked
 at approval time, so a human "yes" can't bust a budget.
 
+**x402 — pay-per-request APIs.** Agents can also buy paid HTTP resources with
+`pay_x402(url, max_amount)`: agentmandate does the [x402](https://docs.cdp.coinbase.com/x402/welcome)
+handshake (`402 Payment Required` → price quote), runs the quoted price through
+the **same policy pipeline** — caps, budgets, allowlist, approval queue — and
+only on ALLOW signs an EIP-3009 authorization for *exactly* the quoted amount
+(gasless; the recipient's facilitator settles on-chain). The server's quote is
+held to the agent's stated `max_amount`, the token contract must match the
+registry, and if a frozen payment is approved later the terms are re-fetched —
+a payee/asset change or a price hike refuses instead of paying.
+
 The **MCP server is the product**; agents are just clients of it.
 
 ## Design principles
@@ -102,8 +112,8 @@ The **MCP server is the product**; agents are just clients of it.
   timeouts fail the audit row. "Executed" means *mined with status 1*.
 - **The policy engine is pure logic** (`src/agentmandate/services/policy.py`)
   — no I/O — so it is exhaustively unit-tested. The code guarding money is the
-  code under the most tests (132 across the engine, auth, audit, ERC-20,
-  approvals, the allowance ledger, the chain rails, and the CLI).
+  code under the most tests (171 across the engine, auth, audit, ERC-20,
+  approvals, the allowance ledger, x402, the chain rails, and the CLI).
 - **Config, not code.** Limits live in `policy.yaml`. Each asset has its own
   limits and its own budget — 10 USDC never eats into an ETH ceiling — and a
   token is payable only if the policy names it.
@@ -166,7 +176,12 @@ CHAIN_ID=8453 RPC_URL=https://mainnet.base.org agentmandate init
 1. `init` prints the funding address. Send it a small USDC float and a few
    dollars of ETH for gas — **withdraw on the Base network**, not Ethereum.
 2. Edit `policy.yaml` down to numbers you'd let an autonomous process spend.
-   Set the `allowlist` to known recipients.
+   Set the `allowlist` to known recipients. If your agent will legitimately
+   discover *new* payees (vendors, APIs), set `unknown_recipient: ask` —
+   an off-allowlist payment then freezes in the approval queue for you to
+   rule on (one payment, one ruling; the address is not remembered) instead
+   of being denied outright. Every other limit still applies first, so an
+   over-cap request to a stranger dies on the cap, never reaching the queue.
 3. Check the card: `agentmandate status`.
 4. Flip `ENABLE_SENDS=true` **last**.
 
@@ -188,10 +203,11 @@ src/agentmandate/
 │   ├── auth.py                  # Bearer API-key auth + per-request identity
 │   ├── chain.py                 # web3 wrapper — gas rails, nonce lock, receipts
 │   ├── tokens.py                # known-token registry (symbol → address/decimals)
+│   ├── x402.py                  # x402 pay-per-request: 402 parsing, EIP-3009 signing
 │   └── wallet.py                # dedicated wallet: explicit create, mainnet guard
 ├── schemas/schemas.py           # contracts (Decimal money, dataclasses)
 └── configs/base.py              # pydantic settings
-tests/                           # 132 tests
+tests/                           # 171 tests
 examples/demo_agent.py           # a LangChain agent that uses the server
 examples/agent-shop/             # complete solo-dev setup: agent + operator
                                  #   approve/reject CLI (the mainnet-test rig)
@@ -205,7 +221,7 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e ".[demo,dev]"
 cp .env.example .env
 
-pytest                           # 132 tests — the policy engine and the rails
+pytest                           # 171 tests — the policy engine and the rails
 python examples/demo_agent.py    # watch an agent get allowed / blocked / gated
 ```
 
@@ -225,8 +241,9 @@ per-asset policies, guarded token `approve()` with the **allowance ledger**
 (admin-gated, re-checked at approval time), Bearer-key auth, append-only audit
 log, gas-fee ceiling + fixed gas limits (untrusted RPC), pending-nonce with a
 per-wallet lock, receipt-confirmed sends, balance preflight, `init`/`status`
-operator CLI, USDC on Base + Ethereum (mainnet and testnets), stdio + hosted
-HTTP transports, and a LangChain demo agent. 132 tests.
+operator CLI, USDC on Base + Ethereum (mainnet and testnets), **x402
+pay-per-request purchases** (policy-guarded EIP-3009 signing), stdio + hosted
+HTTP transports, and a LangChain demo agent. 171 tests.
 
 ## Security checks
 

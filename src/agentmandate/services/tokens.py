@@ -20,6 +20,11 @@ class TokenInfo:
     symbol: str
     address: str      # checksummed contract address
     decimals: int     # USDC is 6, NOT 18 — the classic footgun
+    # EIP-712 domain of the contract — needed to sign EIP-3009 authorizations
+    # (x402 payments). Always taken from this registry, never from the server's
+    # 402 body: the contract is known, so we don't trust its word for the domain.
+    eip712_name: str = "USD Coin"
+    eip712_version: str = "2"
 
 
 # chain_id -> {symbol: TokenInfo}
@@ -34,13 +39,16 @@ KNOWN_TOKENS: dict[int, dict[str, TokenInfo]] = {
     1: {
         "USDC": TokenInfo("USDC", "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", 6),
     },
-    # Base Sepolia — the default testnet (see configs/base.py).
+    # Base Sepolia — the default testnet (see configs/base.py). Circle's
+    # testnet deployments use the shorter EIP-712 name "USDC".
     84532: {
-        "USDC": TokenInfo("USDC", "0x036CbD53842c5426634e7929541eC2318f3dCF7e", 6),
+        "USDC": TokenInfo("USDC", "0x036CbD53842c5426634e7929541eC2318f3dCF7e", 6,
+                          eip712_name="USDC"),
     },
     # Ethereum Sepolia — Circle testnet USDC.
     11155111: {
-        "USDC": TokenInfo("USDC", "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238", 6),
+        "USDC": TokenInfo("USDC", "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238", 6,
+                          eip712_name="USDC"),
     },
 }
 

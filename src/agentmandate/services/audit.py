@@ -11,15 +11,23 @@ failure), which is why each row carries a `status`:
     recorded  - policy decision made, no send attempted
                 (covers deny, needs_approval, and allow-with-sends-off)
     executed  - the transfer was broadcast; tx_hash is set
-    failed    - the transfer was attempted and raised; no funds moved
+    failed    - the transfer was attempted and raised BEFORE any funds could
+                move; no funds moved (true for on-chain sends, and for x402
+                failures that occur before the signature is transmitted)
     rejected  - a needs_approval row a human declined (or a hard limit blocked
                 at approval time); no funds moved
+    skipped   - an ALLOW where no payment was ultimately made (an x402 resource
+                served for free before we paid); no funds moved
+    settlement_unknown - an x402 authorization was transmitted but the HTTP
+                outcome failed; the signature MAY have settled on-chain, so this
+                counts toward the budget and is never retried/reverted
 
 When a human approves a pending row, its decision is rewritten allow (the human
 converted needs_approval -> allow) and status becomes executed/failed. Budget
-accounting (`approved_spends`) counts only decision='allow' rows that did NOT
-fail — so a still-pending or rejected approval never consumes budget, an
-approved+executed one does, and a failed send never does.
+accounting (`approved_spends`) counts decision='allow' rows except 'failed' and
+'skipped' (where no money moved) — so a still-pending or rejected approval never
+consumes budget, an approved+executed one does, a failed/skipped one does not,
+and an x402 'settlement_unknown' does (the funds may have moved).
 """
 
 from __future__ import annotations
@@ -58,7 +66,8 @@ class AuditLog:
                     status     TEXT    NOT NULL DEFAULT 'recorded',  -- see status vocab below
                     tx_hash    TEXT,
                     error      TEXT,
-                    approver   TEXT             -- who resolved a needs_approval row
+                    approver   TEXT,            -- who resolved a needs_approval row
+                    context    TEXT             -- operation context, e.g. the x402 URL
                 )
                 """
             )
@@ -75,6 +84,8 @@ class AuditLog:
                 )
             if "approver" not in existing:
                 self._conn.execute("ALTER TABLE audit ADD COLUMN approver TEXT")
+            if "context" not in existing:
+                self._conn.execute("ALTER TABLE audit ADD COLUMN context TEXT")
             # budget queries filter by agent + recency; index makes them O(log n).
             self._conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_audit_agent_ts ON audit (agent_id, ts)"
@@ -88,13 +99,14 @@ class AuditLog:
         now: datetime,
         status: str = "recorded",
         tx_hash: str | None = None,
+        context: str | None = None,
     ) -> int:
         """Insert an attempt and return its row id (used to stamp the outcome later)."""
         with self._lock:
             cur = self._conn.execute(
                 "INSERT INTO audit (ts, agent_id, recipient, amount, asset, operation, "
-                "reason, decision, rule, detail, status, tx_hash) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "reason, decision, rule, detail, status, tx_hash, context) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     now.isoformat(),
                     request.agent_id,
@@ -108,6 +120,7 @@ class AuditLog:
                     decision.reason,
                     status,
                     tx_hash,
+                    context,
                 ),
             )
             self._conn.commit()
@@ -129,12 +142,37 @@ class AuditLog:
             )
             self._conn.commit()
 
+    def mark_skipped(self, row_id: int, note: str) -> None:
+        """An ALLOW where no payment was ultimately made (e.g. an x402 resource
+        became free before we paid). Excluded from budget — nothing was spent."""
+        with self._lock:
+            self._conn.execute(
+                "UPDATE audit SET status = 'skipped', error = ? WHERE id = ?",
+                (note, row_id),
+            )
+            self._conn.commit()
+
+    def mark_settlement_unknown(self, row_id: int, error: str) -> None:
+        """An x402 authorization was transmitted but the outcome is unknown.
+
+        The signed authorization may have been settled on-chain by the payee's
+        facilitator regardless of the HTTP reply, so — unlike 'failed' — this
+        status COUNTS toward the budget (approved_spends includes it). It is
+        terminal: the row is never rolled back to pending for a free retry."""
+        with self._lock:
+            self._conn.execute(
+                "UPDATE audit SET status = 'settlement_unknown', error = ? "
+                "WHERE id = ?",
+                (error, row_id),
+            )
+            self._conn.commit()
+
     # --- approval-completion flow ---------------------------------------------
 
     def pending_approvals(self, agent_id: str | None = None) -> list[dict]:
         """needs_approval rows still awaiting a human decision (status=recorded)."""
         cols = ["id", "ts", "agent_id", "recipient", "amount", "asset",
-                "operation", "detail"]
+                "operation", "detail", "context"]
         # cols are hardcoded literals; every runtime value binds via ? params.
         sql = (f"SELECT {', '.join(cols)} FROM audit "  # nosec B608
                "WHERE decision = 'needs_approval' AND status = 'recorded'")
@@ -149,7 +187,8 @@ class AuditLog:
 
     def get_pending(self, row_id: int) -> dict | None:
         """Fetch one still-pending approval by id, or None if it isn't pending."""
-        cols = ["id", "agent_id", "recipient", "amount", "asset", "operation", "reason"]
+        cols = ["id", "agent_id", "recipient", "amount", "asset", "operation",
+                "reason", "context"]
         with self._lock:
             row = self._conn.execute(
                 # cols are hardcoded literals; the id binds via the ? param.
@@ -251,13 +290,17 @@ class AuditLog:
     ) -> list[tuple[str, Decimal, datetime, str]]:
         """(recipient, amount, ts, asset) for spends that count toward the budget.
 
-        Counts decision='allow' rows that did not fail — so needs_approval and
-        failed sends are excluded. Optionally bounded to rows at/after `since`
-        (the caller passes now-24h; the widest policy window is daily). All
-        assets are returned; the policy engine splits the budget per asset.
+        Counts decision='allow' rows except those where no money moved:
+        'failed' (send raised, funds intact) and 'skipped' (x402 resource went
+        free, never paid) are excluded; 'recorded', 'executed', and
+        'settlement_unknown' (an x402 signature was handed over — funds MAY have
+        moved, so it must count) are included. Optionally bounded to rows
+        at/after `since` (the caller passes now-24h; the widest policy window is
+        daily). All assets are returned; the engine splits the budget per asset.
         """
         sql = ("SELECT recipient, amount, ts, asset FROM audit "
-               "WHERE agent_id = ? AND decision = 'allow' AND status != 'failed'")
+               "WHERE agent_id = ? AND decision = 'allow' "
+               "AND status NOT IN ('failed', 'skipped')")
         params: list = [agent_id]
         if since is not None:
             sql += " AND ts >= ?"
