@@ -30,6 +30,18 @@ class Settings(BaseSettings):
     # Even on testnet, the agent can't send until you opt in.
     enable_sends: bool = False
 
+    # --- Gas safety rails (the RPC is untrusted) ---
+    # Hard ceiling on maxFeePerGas, in gwei. The RPC quotes the price but we
+    # never sign above this — refuse instead. 50 gwei clears normal traffic on
+    # Base (typ. <0.1 gwei) and Ethereum L1 (typ. 1-30 gwei) while blocking a
+    # lying RPC. Worst-case gas cost is bounded by gas_limit x this ceiling.
+    max_fee_gwei: float = 50.0
+    # Fixed gas limit for ERC-20 transfer/approve (USDC needs ~65k). Never
+    # estimated via the RPC, so the endpoint can't inflate it.
+    erc20_gas_limit: int = 120_000
+    # How long to wait for a tx to be mined before reporting it unconfirmed.
+    receipt_timeout: int = 120
+
     # --- Transport ---
     # "stdio" for local spawn-per-client use; "streamable-http" to host the
     # server at a URL that many clients/agents connect to (the org setup).

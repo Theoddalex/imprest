@@ -1,6 +1,10 @@
 # agentmandate spend policy — the guardrails agents CANNOT override.
-# The flat fields are limits for native ETH; `assets` holds per-token limits.
-# Amounts are in whole units of each asset (ETH, or 50 = 50 USDC). Config, not code.
+#
+# STABLECOIN-FIRST: agents pay vendors in tokens (USDC), never in ETH. The
+# `assets` map holds the headline limits, in whole token units (10 = 10 USDC).
+# The flat ETH fields exist only as a safety net — ETH in this wallet is gas
+# money (the "stamps" that pay for transactions), so its limits are near zero;
+# any real ETH payment attempt should look anomalous and get denied/escalated.
 #
 # `default` applies to every agent; entries under `agents` override only the
 # fields they specify, keyed by the authenticated agent id (from the API key
@@ -8,49 +12,57 @@
 #
 # A token is payable ONLY if it has an `assets` entry — the map doubles as the
 # token allowlist. Its budget is tracked separately from ETH and every other
-# token (50 USDC never eats into an ETH ceiling).
+# token (10 USDC never eats into an ETH ceiling).
 
 default:
-  per_transaction_max: 0.05    # reject any single ETH payment larger than this
-  hourly_max: 0.10             # reject if rolling 1-hour ETH spend would exceed this
-  daily_max: 0.20              # reject if rolling 24-hour ETH spend would exceed this
+  # --- ETH: gas-only lane. Agents should never pay vendors in ETH. ---
+  per_transaction_max: 0.002   # ~ a few dollars; blocks any real ETH transfer
+  hourly_max: 0.003
+  daily_max: 0.005
+  approval_threshold: 0.001    # effectively: any ETH movement wakes a human
   rate_limit_per_minute: 5     # at most this many payments per 60s window (all assets)
-  approval_threshold: 0.02     # above this, a human must approve (ETH)
   allowlist: []                # if non-empty, ONLY these recipients (lowercase)
   denylist: []                 # never pay these, overrides everything
+  # --- Stablecoins: the real spending lanes. ---
   assets:
     USDC:                      # amounts in whole USDC (the chain layer handles 6 decimals)
-      per_transaction_max: 25
-      hourly_max: 50
-      daily_max: 100
-      approval_threshold: 20
+      per_transaction_max: 10
+      hourly_max: 20
+      daily_max: 50
+      approval_threshold: 5    # above this, a human must approve
       # Cap on the TOTAL of live token allowances (approve()) across all
       # spenders. Allowances outlive budget windows, so they get their own
       # standing-liability cap. If unset, daily_max is used. approve(x, 0)
       # revokes and frees the cap.
-      max_outstanding_allowance: 50
+      max_outstanding_allowance: 20
 
 agents:
-  # a cautious identity: tiny budget, everything above 0.005 needs a human
+  # a cautious identity: tiny budget, almost everything needs a human
   support-bot:
-    per_transaction_max: 0.01
-    daily_max: 0.02
-    approval_threshold: 0.005
+    assets:
+      USDC:
+        per_transaction_max: 2
+        hourly_max: 5
+        daily_max: 10
+        approval_threshold: 1
+        max_outstanding_allowance: 5
+
+  # a trusted identity: bigger budget, still human-gated above $25
+  procurement:
+    assets:
+      USDC:
+        per_transaction_max: 50
+        hourly_max: 100
+        daily_max: 200
+        approval_threshold: 25
+        max_outstanding_allowance: 100
+
+  # the shopping agent from the agent-shop example
+  shop-agent:
     assets:
       USDC:
         per_transaction_max: 5
         hourly_max: 10
         daily_max: 20
-        approval_threshold: 5
+        approval_threshold: 3
         max_outstanding_allowance: 10
-
-  # a trusted identity: bigger budget
-  procurement:
-    per_transaction_max: 0.05
-    daily_max: 0.20
-
-  # the shopping agent from the agent-shop example
-  shop-agent:
-    per_transaction_max: 0.01
-    daily_max: 0.03
-    approval_threshold: 0.008

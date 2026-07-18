@@ -5,9 +5,9 @@ address. This registry resolves a symbol to the right contract for whatever
 network the server is pointed at, so nobody copy-pastes a 42-char address into
 config and no agent can smuggle an arbitrary token contract into a payment.
 
-Addresses are the official testnet deployments (Circle's testnet USDC). Add
-mainnet entries only alongside the rest of the mainnet hardening — this is a
-testnet-first product.
+Addresses are the official Circle deployments. Base mainnet is the recommended
+real-money target (stablecoin-native, sub-cent gas); Ethereum L1 is listed for
+completeness but L1 gas usually makes small agent payments uneconomical.
 """
 
 from __future__ import annotations
@@ -24,7 +24,17 @@ class TokenInfo:
 
 # chain_id -> {symbol: TokenInfo}
 KNOWN_TOKENS: dict[int, dict[str, TokenInfo]] = {
-    # Base Sepolia — where most agent-payment / x402 activity actually happens.
+    # Base mainnet — the recommended real-money network: Circle-native USDC,
+    # gas well under a cent, and where agent-payment / x402 activity lives.
+    8453: {
+        "USDC": TokenInfo("USDC", "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", 6),
+    },
+    # Ethereum mainnet — Circle USDC. Works, but L1 gas often exceeds a small
+    # agent payment; prefer Base.
+    1: {
+        "USDC": TokenInfo("USDC", "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", 6),
+    },
+    # Base Sepolia — the default testnet (see configs/base.py).
     84532: {
         "USDC": TokenInfo("USDC", "0x036CbD53842c5426634e7929541eC2318f3dCF7e", 6),
     },

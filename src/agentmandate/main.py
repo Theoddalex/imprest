@@ -1,6 +1,11 @@
 """Console entrypoint — `agentmandate` on the command line (or `uvx agentmandate`).
 
-Transport comes from settings/.env:
+Subcommands (operator CLI, see cli.py):
+  agentmandate init      create policy.yaml + the agent's wallet, print the
+                         funding address (the onboarding ceremony)
+  agentmandate status    wallet, balances, policy limits, sends switch
+
+With no subcommand the MCP server runs; transport comes from settings/.env:
   TRANSPORT=stdio            local: each MCP client spawns its own server;
                              the OS is the auth boundary, identity = AGENT_ID
   TRANSPORT=streamable-http  hosted: one server at http://HOST:PORT/mcp.
@@ -13,6 +18,7 @@ import logging
 import sys
 
 from agentmandate.application import create_application
+from agentmandate.cli import run_command
 from agentmandate.configs.base import settings
 from agentmandate.services.auth import (
     AuthMiddleware,
@@ -23,6 +29,11 @@ from agentmandate.services.auth import (
 
 
 def main() -> None:
+    # Operator subcommands run and exit before any server (or logging that
+    # would write to the MCP stdio channel) starts.
+    if run_command(sys.argv[1:]):
+        return
+
     # Logs go to STDERR — stdout is the MCP protocol channel over stdio, so
     # writing logs there would corrupt it. This lights up the agentmandate.* loggers.
     logging.basicConfig(
