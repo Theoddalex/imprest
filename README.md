@@ -52,19 +52,23 @@ engine is the soft limit; the balance is the hard one. Your real wallet
 ## How it works
 
 ```
-Agent: "pay 10 USDC to 0xabc… for the data API"
-        │  (MCP tool call: request_payment, asset="USDC")
-        ▼
-   ┌───────────────────────────── agentmandate ─────────────────────────────┐
-   │  policy engine:  per-tx cap · hourly/daily budget · allow/deny list  │
-   │                  · rate limit · human-approval threshold             │
-   └───────────────────────────────────────────────────────────────────────┘
-        │ ALLOW → preflight balances,        │ DENY → block + log
-        │   sign, broadcast, CONFIRM         ▼
-        │ NEEDS_APPROVAL → queue for human   agent gets a clear reason
-        ▼           │
-   tx mined and     └─► operator approves → limits re-checked → execute
-   audited                                   every attempt is audited
+agent: "pay 10 USDC to 0xabc… for the data API"
+   │
+   │  MCP tool call: request_payment(…, asset="USDC")
+   ▼
+┌────────────────────── agentmandate ──────────────────────┐
+│ policy engine:  per-tx cap · hourly/daily budgets        │
+│ allow/denylist · rate limit · approval threshold         │
+└────────┬───────────────────┬────────────────────┬────────┘
+         │                   │                    │
+       ALLOW          NEEDS_APPROVAL            DENY
+         ▼                   ▼                    ▼
+ preflight, sign,     queue for operator:   block + log;
+ broadcast, wait      approve → re-check    agent gets the
+ for confirmation     limits → execute      exact reason
+         │
+         ▼
+ tx mined + audited
 ```
 
 Payments move **stablecoins (USDC) or ETH**. Stablecoins are the spending
