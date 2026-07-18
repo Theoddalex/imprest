@@ -193,6 +193,8 @@ src/agentmandate/
 └── configs/base.py              # pydantic settings
 tests/                           # 132 tests
 examples/demo_agent.py           # a LangChain agent that uses the server
+examples/agent-shop/             # complete solo-dev setup: agent + operator
+                                 #   approve/reject CLI (the mainnet-test rig)
 ```
 
 ## Developing
@@ -208,6 +210,14 @@ python examples/demo_agent.py    # watch an agent get allowed / blocked / gated
 ```
 
 ## Status
+
+**Tested live on Base mainnet** — an LLM agent running the full verdict ladder
+with real USDC: payment allowed and mined, payment frozen for human approval
+then executed, over-limit payment denied, an exact-amount allowance granted and
+revoked (ledger and on-chain state verified in agreement), and a
+non-allowlisted recipient blocked. Every attempt in the audit log with the rule
+that fired; total gas for the ceremony ≈ $0.01. The setup used is
+`examples/agent-shop/`.
 
 Working v1, mainnet-hardened chain layer: pure policy engine, per-agent +
 per-asset policies, guarded token `approve()` with the **allowance ledger**
