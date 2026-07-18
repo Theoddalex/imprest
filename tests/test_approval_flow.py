@@ -136,6 +136,59 @@ def test_needs_approval_shows_up_then_approve_executes(tmp_path):
     assert tools["list_pending_approvals"]()["pending"] == []
 
 
+# ---- unknown_recipient: "ask" — off-allowlist payments via the queue -----------
+
+def test_ask_mode_unknown_recipient_freezes_then_approval_executes_once(tmp_path):
+    stranger = "0xCCCC000000000000000000000000000000000003"
+    chain = FakeChain()
+    audit = AuditLog(str(tmp_path / "audit.db"))
+    store = PolicyStore(
+        {**DEFAULT, "allowlist": [RECIPIENT.lower()], "unknown_recipient": "ask"}, {}
+    )
+    mcp = FakeMCP()
+    register_payment_tools(mcp, store, audit, get_chain=lambda: chain,
+                           enable_sends=True, chain_id=BASE_SEPOLIA)
+    tools = mcp.tools
+    as_admin()
+
+    # Off-allowlist recipient, within all limits -> queued, nothing moves.
+    resp = tools["request_payment"](stranger, 0.01, "new vendor")
+    assert resp["decision"] == "needs_approval"
+    assert resp["rule"] == "allowlist_unknown_recipient"
+    assert chain.calls == []
+
+    # Human approves -> that ONE payment executes.
+    pid = tools["list_pending_approvals"]()["pending"][0]["id"]
+    r = tools["resolve_approval"](pid, approve=True, note="verified vendor")
+    assert r["resolved"] and r["executed"]
+    assert chain.calls == [(stranger, Decimal("0.01"))]
+
+    # One-time semantics: the approval does NOT allowlist the address —
+    # the very next payment to it freezes again.
+    resp2 = tools["request_payment"](stranger, 0.01, "same vendor again")
+    assert resp2["decision"] == "needs_approval"
+    assert resp2["rule"] == "allowlist_unknown_recipient"
+    assert chain.calls == [(stranger, Decimal("0.01"))]  # still just the one send
+
+
+def test_ask_mode_never_queues_what_hard_limits_deny(tmp_path):
+    stranger = "0xCCCC000000000000000000000000000000000003"
+    chain = FakeChain()
+    audit = AuditLog(str(tmp_path / "audit.db"))
+    store = PolicyStore(
+        {**DEFAULT, "allowlist": [RECIPIENT.lower()], "unknown_recipient": "ask"}, {}
+    )
+    mcp = FakeMCP()
+    register_payment_tools(mcp, store, audit, get_chain=lambda: chain,
+                           enable_sends=True, chain_id=BASE_SEPOLIA)
+    tools = mcp.tools
+    as_admin()
+
+    resp = tools["request_payment"](stranger, 0.10)  # over per_transaction_max
+    assert resp["decision"] == "deny" and resp["rule"] == "per_transaction_max"
+    assert tools["list_pending_approvals"]()["pending"] == []
+
+
 # ---- reject never moves funds -------------------------------------------------
 
 def test_reject_does_not_execute_or_consume_budget(tmp_path):

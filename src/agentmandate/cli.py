@@ -44,6 +44,10 @@ default:
   rate_limit_per_minute: 5
   allowlist: []          # if non-empty, ONLY these recipients (lowercase)
   denylist: []           # never pay these, overrides everything
+  # What an allowlist miss means. "deny" blocks outright; "ask" sends the
+  # payment to the approval queue instead (all other limits still apply),
+  # so your agent can propose NEW vendors and you rule per payment.
+  unknown_recipient: deny
   # --- Stablecoins: the real spending lanes ---
   assets:
     USDC:

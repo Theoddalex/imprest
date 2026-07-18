@@ -41,6 +41,13 @@ def _asset_limits_from_dict(raw: dict) -> AssetLimits:
 
 
 def _policy_from_dict(raw: dict) -> Policy:
+    unknown = str(raw.get("unknown_recipient", "deny")).lower()
+    if unknown not in ("deny", "ask"):
+        # Fail closed at load time: a typo here must not silently become "deny
+        # forever" or, worse, be interpreted loosely later.
+        raise ValueError(
+            f"unknown_recipient must be 'deny' or 'ask', got {unknown!r}"
+        )
     return Policy(
         per_transaction_max=Decimal(str(raw["per_transaction_max"])),
         daily_max=Decimal(str(raw["daily_max"])),
@@ -49,6 +56,7 @@ def _policy_from_dict(raw: dict) -> Policy:
         approval_threshold=Decimal(str(raw["approval_threshold"])),
         allowlist=[a.lower() for a in raw.get("allowlist", [])],
         denylist=[a.lower() for a in raw.get("denylist", [])],
+        unknown_recipient=unknown,
         assets={
             symbol: _asset_limits_from_dict(limits)
             for symbol, limits in (raw.get("assets") or {}).items()
@@ -139,8 +147,13 @@ class PolicyEngine:
                 Decision.DENY, f"recipient {request.recipient} is denylisted", "denylist"
             )
 
-        # 2. Allowlist — if configured, recipient must be on it.
-        if p.allowlist and recipient not in p.allowlist:
+        # 2. Allowlist — if configured, recipient must be on it. With
+        #    unknown_recipient="ask", a miss is NOT an instant deny: the
+        #    request keeps running the gauntlet below (any hard-limit breach
+        #    still denies) and, only if it survives them all, lands in the
+        #    approval queue for a human to rule on (rule 10).
+        unknown = bool(p.allowlist) and recipient not in p.allowlist
+        if unknown and p.unknown_recipient != "ask":
             return PolicyDecision(
                 Decision.DENY,
                 f"recipient {request.recipient} is not on the allowlist",
@@ -231,7 +244,18 @@ class PolicyEngine:
                 "rate_limit_per_minute",
             )
 
-        # 10. Above the approval threshold → allowed, but a human must confirm.
+        # 10. Unknown recipient in "ask" mode — it survived every hard limit,
+        #     so a human decides. Checked before the amount threshold: an
+        #     off-list recipient always needs a ruling, however small the sum.
+        if unknown:
+            return PolicyDecision(
+                Decision.NEEDS_APPROVAL,
+                f"recipient {request.recipient} is not on the allowlist; "
+                "human confirmation required",
+                "allowlist_unknown_recipient",
+            )
+
+        # 11. Above the approval threshold → allowed, but a human must confirm.
         if amount > limits.approval_threshold:
             return PolicyDecision(
                 Decision.NEEDS_APPROVAL,
@@ -240,7 +264,7 @@ class PolicyEngine:
                 "approval_threshold",
             )
 
-        # 11. All checks passed.
+        # 12. All checks passed.
         return PolicyDecision(Decision.ALLOW, "within policy", "ok")
 
     @staticmethod

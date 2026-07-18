@@ -119,6 +119,11 @@ class Policy:
     approval_threshold: Decimal           # ETH payments above this need human approval
     allowlist: list[str] = field(default_factory=list)  # if non-empty, ONLY these recipients
     denylist: list[str] = field(default_factory=list)   # never pay these, overrides everything
+    # What an allowlist MISS means: "deny" blocks outright; "ask" routes the
+    # request to the human approval queue instead — but only after every other
+    # limit (denylist, caps, budgets, rate) has passed. Irrelevant when the
+    # allowlist is empty.
+    unknown_recipient: str = "deny"
     assets: dict[str, AssetLimits] = field(default_factory=dict)  # per-token limits
 
     def limits_for(self, asset: str) -> AssetLimits | None:

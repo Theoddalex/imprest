@@ -95,6 +95,68 @@ def test_empty_allowlist_means_no_allowlist_restriction():
     assert d.decision is Decision.ALLOW
 
 
+# ---- unknown_recipient: "ask" ---------------------------------------------------
+
+def ask_policy(**overrides) -> Policy:
+    return make_policy(
+        allowlist=[ALICE.lower()], unknown_recipient="ask", **overrides
+    )
+
+
+def test_ask_mode_escalates_unknown_recipient_instead_of_denying():
+    engine = PolicyEngine(ask_policy())
+    d = engine.evaluate(req("0.001", recipient=BOB), history=[], now=NOW)
+    assert d.decision is Decision.NEEDS_APPROVAL
+    assert d.rule == "allowlist_unknown_recipient"
+
+
+def test_ask_mode_still_denies_when_a_hard_limit_is_breached():
+    # The escalation is NOT a bypass: a request over the per-tx cap dies on
+    # the cap, it never reaches the approval queue.
+    engine = PolicyEngine(ask_policy())
+    d = engine.evaluate(req("0.10", recipient=BOB), history=[], now=NOW)
+    assert d.decision is Decision.DENY
+    assert d.rule == "per_transaction_max"
+
+
+def test_ask_mode_still_denies_budget_breaches():
+    engine = PolicyEngine(ask_policy())
+    history = [spend("0.09", minutes_ago=10)]
+    d = engine.evaluate(req("0.02", recipient=BOB), history=history, now=NOW)
+    assert d.decision is Decision.DENY
+    assert d.rule == "hourly_max"
+
+
+def test_ask_mode_denylist_stays_absolute():
+    engine = PolicyEngine(ask_policy(denylist=[BOB.lower()]))
+    d = engine.evaluate(req("0.001", recipient=BOB), history=[], now=NOW)
+    assert d.decision is Decision.DENY
+    assert d.rule == "denylist"
+
+
+def test_ask_mode_leaves_allowlisted_recipients_untouched():
+    engine = PolicyEngine(ask_policy())
+    d = engine.evaluate(req("0.001", recipient=ALICE), history=[], now=NOW)
+    assert d.decision is Decision.ALLOW
+
+
+def test_ask_mode_is_irrelevant_with_an_empty_allowlist():
+    engine = PolicyEngine(make_policy(allowlist=[], unknown_recipient="ask"))
+    d = engine.evaluate(req("0.001", recipient=BOB), history=[], now=NOW)
+    assert d.decision is Decision.ALLOW
+
+
+def test_unknown_recipient_config_typo_fails_closed_at_load():
+    from agentmandate.services.policy import _policy_from_dict
+
+    with pytest.raises(ValueError, match="unknown_recipient"):
+        _policy_from_dict(dict(
+            per_transaction_max="0.05", daily_max="0.20", hourly_max="0.10",
+            rate_limit_per_minute=5, approval_threshold="0.02",
+            unknown_recipient="allow",   # not a valid mode
+        ))
+
+
 # ---- amount sanity ------------------------------------------------------------
 
 @pytest.mark.parametrize("amount", ["0", "-0.01"])
