@@ -7,16 +7,16 @@ it only assembles the pieces.
 
 from __future__ import annotations
 
-from agentmandate.api.payments import register_payment_tools
-from agentmandate.configs.base import settings
-from agentmandate.services.audit import AuditLog
-from agentmandate.services.policy import PolicyStore
+from imprest.api.payments import register_payment_tools
+from imprest.configs.base import settings
+from imprest.services.audit import AuditLog
+from imprest.services.policy import PolicyStore
 
 
 def create_application():
     from mcp.server.fastmcp import FastMCP
 
-    mcp = FastMCP("agentmandate")
+    mcp = FastMCP("imprest")
 
     store = PolicyStore.load(settings.policy_path)
     audit = AuditLog(settings.audit_db_path)
@@ -26,8 +26,8 @@ def create_application():
     def get_chain():
         from decimal import Decimal
 
-        from agentmandate.services.chain import Chain
-        from agentmandate.services.wallet import load_or_create_account
+        from imprest.services.chain import Chain
+        from imprest.services.wallet import load_or_create_account
 
         account = load_or_create_account(settings.keystore_path, settings.chain_id)
         return Chain(

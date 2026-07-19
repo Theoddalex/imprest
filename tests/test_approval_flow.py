@@ -16,10 +16,10 @@ from decimal import Decimal
 
 import pytest
 
-from agentmandate.api.payments import register_payment_tools
-from agentmandate.services.audit import AuditLog
-from agentmandate.services.auth import current_agent_id, current_is_admin
-from agentmandate.services.policy import PolicyStore
+from imprest.api.payments import register_payment_tools
+from imprest.services.audit import AuditLog
+from imprest.services.auth import current_agent_id, current_is_admin
+from imprest.services.policy import PolicyStore
 
 DEFAULT = dict(
     per_transaction_max="0.05", daily_max="0.20", hourly_max="0.10",

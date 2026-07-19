@@ -12,13 +12,13 @@ from decimal import Decimal
 
 import pytest
 
-from agentmandate.schemas.schemas import (
+from imprest.schemas.schemas import (
     Decision,
     PaymentRequest,
     Policy,
     SpendRecord,
 )
-from agentmandate.services.policy import PolicyEngine
+from imprest.services.policy import PolicyEngine
 
 NOW = datetime(2026, 7, 17, 12, 0, 0)
 ALICE = "0xAAAA000000000000000000000000000000000001"
@@ -147,7 +147,7 @@ def test_ask_mode_is_irrelevant_with_an_empty_allowlist():
 
 
 def test_unknown_recipient_config_typo_fails_closed_at_load():
-    from agentmandate.services.policy import _policy_from_dict
+    from imprest.services.policy import _policy_from_dict
 
     with pytest.raises(ValueError, match="unknown_recipient"):
         _policy_from_dict(dict(

@@ -1,4 +1,4 @@
-"""Operator CLI — `agentmandate init` and `agentmandate status`.
+"""Operator CLI — `imprest init` and `imprest status`.
 
 init   is the onboarding ceremony: create policy.yaml (the limits) and the
        agent's dedicated wallet (the prepaid card), then print the funding
@@ -26,7 +26,7 @@ NETWORKS = {
 }
 
 POLICY_TEMPLATE = """\
-# agentmandate spend policy — the guardrails your agent CANNOT override.
+# imprest spend policy — the guardrails your agent CANNOT override.
 #
 # STABLECOIN-FIRST: agents pay vendors in tokens (USDC). ETH in this wallet
 # is gas money only, so its limits are near zero — any real ETH payment
@@ -71,8 +71,8 @@ def _network(chain_id: int) -> str:
 
 
 def cmd_init(import_key: bool = False) -> None:
-    from agentmandate.configs.base import settings
-    from agentmandate.services.wallet import (
+    from imprest.configs.base import settings
+    from imprest.services.wallet import (
         MAINNET_CHAIN_IDS,
         create_account,
         load_account,
@@ -122,10 +122,10 @@ def cmd_init(import_key: bool = False) -> None:
 
 
 def cmd_status() -> None:
-    from agentmandate.configs.base import settings
-    from agentmandate.services.policy import PolicyStore
-    from agentmandate.services.tokens import token_for
-    from agentmandate.services.wallet import load_account
+    from imprest.configs.base import settings
+    from imprest.services.policy import PolicyStore
+    from imprest.services.tokens import token_for
+    from imprest.services.wallet import load_account
 
     net = _network(settings.chain_id)
 
@@ -139,7 +139,7 @@ def cmd_status() -> None:
     if acct:
         print(f"  wallet   {acct.address}")
         try:
-            from agentmandate.services.chain import Chain
+            from imprest.services.chain import Chain
 
             chain = Chain(settings.rpc_url, settings.chain_id)
             eth = chain.get_balance(acct.address)
@@ -166,7 +166,7 @@ def cmd_status() -> None:
         print(f"           ETH per-tx {policy.per_transaction_max} (gas-only lane) · "
               f"identity '{settings.agent_id}'")
     except FileNotFoundError:
-        print(f"  policy   no {settings.policy_path} — run `agentmandate init`")
+        print(f"  policy   no {settings.policy_path} — run `imprest init`")
 
     print(f"  network  {net} (chain {settings.chain_id})")
     print(f"  sends    {'ENABLED' if settings.enable_sends else 'OFF (ENABLE_SENDS=false)'}")
@@ -177,7 +177,7 @@ def run_command(argv: list[str]) -> bool:
     import argparse
 
     parser = argparse.ArgumentParser(
-        prog="agentmandate",
+        prog="imprest",
         description="Spend-control MCP server between AI agents and a wallet. "
                     "With no subcommand, runs the server (transport from .env).",
     )

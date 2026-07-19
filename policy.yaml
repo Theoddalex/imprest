@@ -1,4 +1,4 @@
-# agentmandate spend policy — the guardrails agents CANNOT override.
+# imprest spend policy — the guardrails agents CANNOT override.
 #
 # STABLECOIN-FIRST: agents pay vendors in tokens (USDC), never in ETH. The
 # `assets` map holds the headline limits, in whole token units (10 = 10 USDC).

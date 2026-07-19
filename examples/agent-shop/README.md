@@ -1,14 +1,14 @@
 # agent-shop — a complete solo-dev integration
 
-A shopping agent that pays through agentmandate over stdio, plus the operator
-tooling that goes with it. This is the exact setup used for agentmandate's
+A shopping agent that pays through imprest over stdio, plus the operator
+tooling that goes with it. This is the exact setup used for imprest's
 live Base-mainnet test: real USDC, real verdicts, every attempt audited.
 
 Two sides, two files:
 
 - **`shop_agent.py`** — the *agent* side. A LangChain agent whose only route to
   money is the `request_payment` / `request_approval` MCP tools. It spawns
-  agentmandate as a child process; it never sees the key or the policy.
+  imprest as a child process; it never sees the key or the policy.
 - **`operator.py`** — the *human* side. When a payment comes back
   `needs_approval`, it freezes in the queue until you rule on it:
 
@@ -22,14 +22,14 @@ Two sides, two files:
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install git+https://github.com/theoddalex/agentmandate.git \
+pip install git+https://github.com/theoddalex/imprest.git \
             langchain langchain-openai langchain-mcp-adapters python-dotenv
 
-agentmandate init          # creates policy.yaml + the agent's wallet
+imprest init          # creates policy.yaml + the agent's wallet
 ```
 
 Create a `.env` next to the scripts (LLM key for the agent's brain, chain
-config for the guard — see agentmandate's `.env.example` for the full list):
+config for the guard — see imprest's `.env.example` for the full list):
 
 ```bash
 OPENROUTER_API_KEY=sk-or-...
@@ -52,4 +52,4 @@ python shop_agent.py "Pay 2 USDC to 0x00…dEaD for a discount."          # deny
 
 The trace printed by `shop_agent.py` shows both halves of every exchange —
 what the model asked for (`[agent]`), and what the policy answered (`[guard]`).
-The model decides what to *ask*; agentmandate decides what *happens*.
+The model decides what to *ask*; imprest decides what *happens*.

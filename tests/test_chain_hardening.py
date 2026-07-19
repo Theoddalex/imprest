@@ -14,7 +14,7 @@ from decimal import Decimal
 
 import pytest
 
-from agentmandate.services.chain import Chain
+from imprest.services.chain import Chain
 
 GWEI = 10**9
 TOKEN = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
@@ -236,7 +236,7 @@ def test_confirmed_tx_returns_hash():
 # ---- mainnet token registry ---------------------------------------------------
 
 def test_mainnet_usdc_entries_exist():
-    from agentmandate.services.tokens import token_for
+    from imprest.services.tokens import token_for
     base = token_for(8453, "USDC")
     l1 = token_for(1, "USDC")
     assert base.address == "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"

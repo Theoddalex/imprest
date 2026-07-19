@@ -20,17 +20,17 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 
-from agentmandate.schemas.schemas import (
+from imprest.schemas.schemas import (
     AllowanceRecord,
     Decision,
     PaymentRequest,
     SpendRecord,
 )
-from agentmandate.services.audit import AuditLog
-from agentmandate.services.auth import current_agent_id, current_is_admin
-from agentmandate.services.chain import _to_base_units
-from agentmandate.services.policy import PolicyEngine, PolicyStore
-from agentmandate.services.tokens import token_for
+from imprest.services.audit import AuditLog
+from imprest.services.auth import current_agent_id, current_is_admin
+from imprest.services.chain import _to_base_units
+from imprest.services.policy import PolicyEngine, PolicyStore
+from imprest.services.tokens import token_for
 
 # widest policy window is daily; only the last 24h can affect a decision.
 _BUDGET_WINDOW = timedelta(hours=24)
@@ -39,7 +39,7 @@ _BUDGET_WINDOW = timedelta(hours=24)
 # never corrupts the stdio MCP protocol on stdout). This is the operational
 # companion to the audit log: the audit table is the durable record, these logs
 # are the live stream you tail while the server runs.
-log = logging.getLogger("agentmandate.payments")
+log = logging.getLogger("imprest.payments")
 
 
 class X402SettlementUnknown(Exception):
@@ -130,7 +130,7 @@ def register_payment_tools(
         """
         import time
 
-        from agentmandate.services import x402 as x402svc
+        from imprest.services import x402 as x402svc
 
         http = _x402_client()
         resp = x402svc.safe_get(http, url, allow_local=_allow_local_http,
@@ -308,7 +308,7 @@ def register_payment_tools(
         but the 'recipient' comes from the SERVER's 402 response, and execution
         is an EIP-3009 signature + HTTP retry instead of a broadcast.
         """
-        from agentmandate.services import x402 as x402svc
+        from imprest.services import x402 as x402svc
 
         agent_id = current_agent_id.get()
         now = _now()
@@ -450,7 +450,7 @@ def register_payment_tools(
         subscription, or swap) can later pull funds. The policy decides whether
         it is allowed, blocked, or needs human approval.
 
-        agentmandate approves an EXACT amount only — never an unlimited allowance,
+        imprest approves an EXACT amount only — never an unlimited allowance,
         the vector behind most token drains. The allowance is capped by, and
         counts against, the same per-asset limits as a direct payment, and the
         TOTAL of live allowances across all spenders is itself capped (an
@@ -576,7 +576,7 @@ def register_payment_tools(
             if enable_sends and get_chain:
                 try:
                     if request.operation == "x402":
-                        from agentmandate.services import x402 as x402svc
+                        from imprest.services import x402 as x402svc
 
                         # Deterministic nonce keyed to this row: re-resolving
                         # after a settlement-unknown re-sends the SAME auth.
@@ -683,7 +683,7 @@ def _looks_like_address(addr: str) -> bool:
 def _reject(audit, agent_id, recipient, amount, reason, now, asset, operation,
             detail, rule) -> dict:
     """Record a boundary-level denial and return the standard response shape."""
-    from agentmandate.schemas.schemas import PolicyDecision
+    from imprest.schemas.schemas import PolicyDecision
 
     decision = PolicyDecision(Decision.DENY, detail, rule)
     request = PaymentRequest(

@@ -32,7 +32,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from urllib.parse import urlparse
 
-from agentmandate.services.tokens import KNOWN_TOKENS
+from imprest.services.tokens import KNOWN_TOKENS
 
 # x402 network identifiers per chain — both the human name used by x402 v1
 # and the CAIP-2 form some newer servers emit.

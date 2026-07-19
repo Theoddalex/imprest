@@ -18,11 +18,11 @@ import pytest
 from eth_account import Account
 from eth_account.messages import encode_typed_data
 
-from agentmandate.api.payments import register_payment_tools
-from agentmandate.services.audit import AuditLog
-from agentmandate.services.auth import current_agent_id, current_is_admin
-from agentmandate.services.policy import PolicyStore
-from agentmandate.services.x402 import X402Error, check_url, parse_402
+from imprest.api.payments import register_payment_tools
+from imprest.services.audit import AuditLog
+from imprest.services.auth import current_agent_id, current_is_admin
+from imprest.services.policy import PolicyStore
+from imprest.services.x402 import X402Error, check_url, parse_402
 
 BASE_SEPOLIA = 84532
 USDC_ADDR = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"  # registry, Base Sepolia
@@ -352,7 +352,7 @@ def test_x402_retry_after_settlement_unknown_reuses_the_same_nonce(tmp_path):
     nonce1 = state["payments"][0]["payload"]["authorization"]["nonce"]
 
     # Even if the same logical payment were signed again, the nonce is stable.
-    from agentmandate.services.x402 import payment_nonce
+    from imprest.services.x402 import payment_nonce
     assert payment_nonce(f"agent-1:{pid}") == nonce1
 
 

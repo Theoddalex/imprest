@@ -26,8 +26,8 @@ import threading
 from collections import defaultdict
 from decimal import Decimal
 
-# Minimal ERC-20 ABI — only the methods agentmandate touches. approve() is included
-# for the GUARDED approval path: agentmandate only ever approves an exact, finite
+# Minimal ERC-20 ABI — only the methods imprest touches. approve() is included
+# for the GUARDED approval path: imprest only ever approves an exact, finite
 # amount (never the unlimited 2**256-1 allowance that is behind most token
 # drains), and only after the policy engine clears it.
 _ERC20_ABI = [
@@ -68,7 +68,7 @@ _ERC20_ABI = [
 ]
 
 # An ERC-20 allowance at or near this is effectively "unlimited" — the pattern
-# behind most wallet drains. agentmandate must never sign one; the policy per-tx cap
+# behind most wallet drains. imprest must never sign one; the policy per-tx cap
 # already blocks large amounts, this is the last-line structural refusal.
 _UINT256_MAX = 2**256 - 1
 

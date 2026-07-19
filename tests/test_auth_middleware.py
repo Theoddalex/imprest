@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from agentmandate.services.auth import (
+from imprest.services.auth import (
     AuthMiddleware,
     current_agent_id,
     current_is_admin,

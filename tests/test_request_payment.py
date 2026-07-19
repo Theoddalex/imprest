@@ -14,10 +14,10 @@ import threading
 
 import pytest
 
-from agentmandate.api.payments import register_payment_tools
-from agentmandate.services.audit import AuditLog
-from agentmandate.services.auth import current_agent_id
-from agentmandate.services.policy import PolicyStore
+from imprest.api.payments import register_payment_tools
+from imprest.services.audit import AuditLog
+from imprest.services.auth import current_agent_id
+from imprest.services.policy import PolicyStore
 
 DEFAULT = dict(
     per_transaction_max="0.05",
@@ -196,7 +196,7 @@ def test_parallel_requests_cannot_bust_the_budget(tmp_path):
 def test_decision_is_logged(tmp_path, caplog):
     import logging
     tools, _ = build(tmp_path)
-    with caplog.at_level(logging.INFO, logger="agentmandate.payments"):
+    with caplog.at_level(logging.INFO, logger="imprest.payments"):
         tools["request_payment"](RECIPIENT, 0.01, "data api")
     line = caplog.text
     assert "agent=agent-1" in line and "asset=ETH" in line and "allow" in line

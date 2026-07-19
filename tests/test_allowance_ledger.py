@@ -21,8 +21,8 @@ from decimal import Decimal
 
 import pytest
 
-from agentmandate.api.payments import register_payment_tools
-from agentmandate.schemas.schemas import (
+from imprest.api.payments import register_payment_tools
+from imprest.schemas.schemas import (
     AllowanceRecord,
     AssetLimits,
     Decision,
@@ -30,9 +30,9 @@ from agentmandate.schemas.schemas import (
     Policy,
     PolicyDecision,
 )
-from agentmandate.services.audit import AuditLog
-from agentmandate.services.auth import current_agent_id, current_is_admin
-from agentmandate.services.policy import PolicyEngine, PolicyStore, _policy_from_dict
+from imprest.services.audit import AuditLog
+from imprest.services.auth import current_agent_id, current_is_admin
+from imprest.services.policy import PolicyEngine, PolicyStore, _policy_from_dict
 
 NOW = datetime(2026, 7, 17, 12, 0, 0)
 SPENDER_X = "0xCCCC000000000000000000000000000000000003"

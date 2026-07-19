@@ -7,7 +7,7 @@ queue until a person rules on it. This script is that person's button:
   python operator.py approve <id> [note]  approve -> limits re-checked -> execute
   python operator.py reject  <id> [note]  reject, nothing moves
 
-It talks to the same agentmandate guard over stdio; over stdio the local
+It talks to the same imprest guard over stdio; over stdio the local
 operator is the admin (you own the box, you own the approve button).
 """
 
@@ -17,13 +17,13 @@ import sys
 
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
-from shop_agent import AGENTMANDATE_SERVER
+from shop_agent import IMPREST_SERVER
 
 
 async def main() -> None:
     cmd = sys.argv[1] if len(sys.argv) > 1 else "list"
 
-    client = MultiServerMCPClient({"agentmandate": AGENTMANDATE_SERVER})
+    client = MultiServerMCPClient({"imprest": IMPREST_SERVER})
     tools = {t.name: t for t in await client.get_tools()}
 
     if cmd == "list":

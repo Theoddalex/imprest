@@ -1,6 +1,6 @@
 """Authentication: API key -> agent identity.
 
-Keys are configured via the AGENTMANDATE_API_KEYS env var ("key:agent_id,key2:id2")
+Keys are configured via the IMPREST_API_KEYS env var ("key:agent_id,key2:id2")
 so secrets stay out of policy.yaml and drop cleanly into k8s secrets.
 
 The resolved identity travels in a contextvar, so the MCP tools (which have no

@@ -3,9 +3,9 @@
 The key is generated LOCALLY from OS entropy (`eth_account.Account.create()`
 -> os.urandom) and never leaves this machine. The model: a fresh wallet is
 born for the agent, the owner funds it with only what the agent may spend,
-and the owner's real wallet never touches agentmandate at all.
+and the owner's real wallet never touches imprest at all.
 
-Creation is an explicit ceremony (`agentmandate init` -> create_account), not a
+Creation is an explicit ceremony (`imprest init` -> create_account), not a
 side effect. On TESTNETS a missing key may still be auto-created at first use
 (zero-config demos); on MAINNET chains a missing key is an error — real-money
 keys must only come into existence when a human asks for one.
@@ -44,7 +44,7 @@ def load_account(keystore_path: str):
 
     if not os.path.exists(keystore_path):
         raise FileNotFoundError(
-            f"no wallet at {keystore_path} — run `agentmandate init` to create one"
+            f"no wallet at {keystore_path} — run `imprest init` to create one"
         )
     with open(keystore_path) as f:
         return Account.from_key(f.read().strip())
@@ -63,6 +63,6 @@ def load_or_create_account(keystore_path: str, chain_id: int | None = None):
         raise RuntimeError(
             f"no wallet at {keystore_path}, and chain {chain_id} is a mainnet — "
             "refusing to silently create a real-money wallet. "
-            "Run `agentmandate init` first."
+            "Run `imprest init` first."
         )
     return create_account(keystore_path)

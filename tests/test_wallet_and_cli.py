@@ -14,7 +14,7 @@ import stat
 
 import pytest
 
-from agentmandate.services.wallet import (
+from imprest.services.wallet import (
     MAINNET_CHAIN_IDS,
     create_account,
     load_account,
@@ -50,7 +50,7 @@ def test_import_existing_key(tmp_path):
     assert imported.address == donor.address
 
 def test_load_missing_wallet_names_the_fix(tmp_path):
-    with pytest.raises(FileNotFoundError, match="agentmandate init"):
+    with pytest.raises(FileNotFoundError, match="imprest init"):
         load_account(str(tmp_path / "nope.key"))
 
 
@@ -83,7 +83,7 @@ def in_tmp_cwd(tmp_path, monkeypatch):
     return tmp_path
 
 def test_init_creates_policy_and_wallet_and_prints_address(in_tmp_cwd, capsys):
-    from agentmandate.cli import cmd_init
+    from imprest.cli import cmd_init
 
     cmd_init()
     out = capsys.readouterr().out
@@ -92,7 +92,7 @@ def test_init_creates_policy_and_wallet_and_prints_address(in_tmp_cwd, capsys):
     assert "never leaves this machine" in out
 
 def test_init_is_idempotent_and_never_touches_existing_files(in_tmp_cwd, capsys):
-    from agentmandate.cli import cmd_init
+    from imprest.cli import cmd_init
 
     cmd_init()
     address = load_account("wallet.key").address
@@ -110,17 +110,17 @@ def test_init_is_idempotent_and_never_touches_existing_files(in_tmp_cwd, capsys)
 # ---- CLI: status ------------------------------------------------------------------
 
 def test_status_without_wallet_says_how_to_get_one(in_tmp_cwd, capsys):
-    from agentmandate.cli import cmd_status
+    from imprest.cli import cmd_status
 
     cmd_status()
     out = capsys.readouterr().out
-    assert "agentmandate init" in out            # both wallet and policy lines
+    assert "imprest init" in out            # both wallet and policy lines
     assert "sends" in out
 
 def test_status_reports_balances_via_chain(in_tmp_cwd, capsys, monkeypatch):
-    from agentmandate import cli
-    from agentmandate.cli import cmd_init, cmd_status
-    from agentmandate.configs.base import settings
+    from imprest import cli
+    from imprest.cli import cmd_init, cmd_status
+    from imprest.configs.base import settings
 
     cmd_init()
     capsys.readouterr()
@@ -142,7 +142,7 @@ def test_status_reports_balances_via_chain(in_tmp_cwd, capsys, monkeypatch):
             from decimal import Decimal
             return Decimal("18.4")
 
-    import agentmandate.services.chain as chain_mod
+    import imprest.services.chain as chain_mod
     monkeypatch.setattr(chain_mod, "Chain", FakeChain)
     monkeypatch.setattr(settings, "chain_id", 8453)   # network with a USDC entry
 
@@ -152,9 +152,9 @@ def test_status_reports_balances_via_chain(in_tmp_cwd, capsys, monkeypatch):
     assert "Base" in out and "sends" in out
 
 def test_serve_is_the_default_and_subcommands_dispatch(monkeypatch):
-    from agentmandate.cli import run_command
+    from imprest.cli import run_command
 
     assert run_command([]) is False              # no subcommand -> server path
     called = []
-    monkeypatch.setattr("agentmandate.cli.cmd_status", lambda: called.append(1))
+    monkeypatch.setattr("imprest.cli.cmd_status", lambda: called.append(1))
     assert run_command(["status"]) is True and called == [1]

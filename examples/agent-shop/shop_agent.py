@@ -1,13 +1,13 @@
-"""agent-shop — a shopping agent that pays through agentmandate (stdio mode).
+"""agent-shop — a shopping agent that pays through imprest (stdio mode).
 
 I'm a solo developer. I own the wallet, I set the limits, and I build this
-agent. I do NOT run a server. When this script starts it SPAWNS agentmandate as a
+agent. I do NOT run a server. When this script starts it SPAWNS imprest as a
 child process, talks to it over stdin/stdout pipes, and that child dies when I
 exit — the same way an editor spawns a language server.
 
 Files that live alongside this script (the "operator" side, which I own):
   policy.yaml   the limits my agent cannot override        (I wrote these)
-  wallet.key    the testnet key agentmandate guards            (auto-created)
+  wallet.key    the testnet key imprest guards            (auto-created)
   audit.db      append-only log of every attempt           (auto-created)
   .env          my config (LLM key, chain, safety switch)
 
@@ -32,10 +32,10 @@ from langchain_openai import ChatOpenAI
 HERE = Path(__file__).parent
 load_dotenv(HERE / ".env")
 
-# agentmandate was installed into THIS venv with `pip install git+https://…/agentmandate`.
+# imprest was installed into THIS venv with `pip install git+https://…/imprest`.
 # Its console script sits next to the running python — a stdio MCP client
 # launches it as a subprocess, so there is no server for me to run.
-AGENTMANDATE_BIN = str(Path(sys.executable).parent / "agentmandate")
+IMPREST_BIN = str(Path(sys.executable).parent / "imprest")
 
 # The OPERATOR knobs, forwarded to the guard subprocess. My agent never sees
 # these — they configure the process on the other side of the pipe.
@@ -51,11 +51,11 @@ GUARD_ENV = {
     "ENABLE_SENDS": os.environ.get("ENABLE_SENDS", "false"),
 }
 
-# My ENTIRE integration with agentmandate: "spawn this command with this config."
+# My ENTIRE integration with imprest: "spawn this command with this config."
 # That's it — no policy, no keys, no engine imported into my project.
-AGENTMANDATE_SERVER = {
+IMPREST_SERVER = {
     "transport": "stdio",
-    "command": AGENTMANDATE_BIN,
+    "command": IMPREST_BIN,
     "args": [],
     "env": GUARD_ENV,
     "cwd": str(HERE),          # so wallet.key / policy.yaml / audit.db resolve here
@@ -69,9 +69,9 @@ VENDOR = "0x0000000000000000000000000000000000000000"
 async def main() -> None:
     ask = sys.argv[1] if len(sys.argv) > 1 else "Buy the premium weather feed."
 
-    # Connecting spawns agentmandate and asks it what tools it offers
+    # Connecting spawns imprest and asks it what tools it offers
     # (request_payment, request_approval, get_balance, …).
-    client = MultiServerMCPClient({"agentmandate": AGENTMANDATE_SERVER})
+    client = MultiServerMCPClient({"imprest": IMPREST_SERVER})
     tools = await client.get_tools()
 
     agent = create_agent(

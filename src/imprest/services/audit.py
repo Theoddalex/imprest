@@ -37,7 +37,7 @@ import threading
 from datetime import datetime
 from decimal import Decimal
 
-from agentmandate.schemas.schemas import PaymentRequest, PolicyDecision
+from imprest.schemas.schemas import PaymentRequest, PolicyDecision
 
 
 class AuditLog:

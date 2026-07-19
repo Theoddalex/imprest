@@ -1,4 +1,4 @@
-"""Demo: a LangChain agent whose payments are gated by the agentmandate MCP server.
+"""Demo: a LangChain agent whose payments are gated by the imprest MCP server.
 
 This is what a developer's setup looks like: their agent code knows NOTHING
 about policies. It just gets a `request_payment` tool from the MCP server —
@@ -48,10 +48,10 @@ def get_model() -> ChatOpenAI:
 
 
 async def main() -> None:
-    # The developer's ONLY integration step: point at the agentmandate server.
+    # The developer's ONLY integration step: point at the imprest server.
     client = MultiServerMCPClient(
         {
-            "agentmandate": {
+            "imprest": {
                 "transport": "stdio",
                 "command": sys.executable,          # this venv's python
                 "args": [str(ROOT / "main.py")],
@@ -60,7 +60,7 @@ async def main() -> None:
         }
     )
     tools = await client.get_tools()
-    print("tools from agentmandate server:", [t.name for t in tools], "\n")
+    print("tools from imprest server:", [t.name for t in tools], "\n")
 
     agent = create_agent(
         model=get_model(),

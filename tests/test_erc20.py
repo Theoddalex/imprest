@@ -14,18 +14,18 @@ from decimal import Decimal
 
 import pytest
 
-from agentmandate.api.payments import register_payment_tools
-from agentmandate.schemas.schemas import (
+from imprest.api.payments import register_payment_tools
+from imprest.schemas.schemas import (
     AssetLimits,
     Decision,
     PaymentRequest,
     Policy,
     SpendRecord,
 )
-from agentmandate.services.audit import AuditLog
-from agentmandate.services.auth import current_agent_id
-from agentmandate.services.chain import _to_base_units
-from agentmandate.services.policy import PolicyEngine, PolicyStore
+from imprest.services.audit import AuditLog
+from imprest.services.auth import current_agent_id
+from imprest.services.chain import _to_base_units
+from imprest.services.policy import PolicyEngine, PolicyStore
 
 NOW = datetime(2026, 7, 17, 12, 0, 0)
 ALICE = "0xAAAA000000000000000000000000000000000001"
@@ -199,7 +199,7 @@ class FakeChain:
 
 
 def token_addr():
-    from agentmandate.services.tokens import token_for
+    from imprest.services.tokens import token_for
     return token_for(BASE_SEPOLIA, "USDC").address
 
 
@@ -344,5 +344,5 @@ def test_approval_counts_against_the_same_budget(tmp_path):
 
 def test_chain_refuses_unlimited_allowance():
     # the last-line structural guard, independent of policy
-    from agentmandate.services.chain import _UINT256_MAX, _to_base_units
+    from imprest.services.chain import _UINT256_MAX, _to_base_units
     assert _to_base_units(Decimal("25"), 6) < _UINT256_MAX  # normal amounts are fine

@@ -1,29 +1,35 @@
-# agentmandate
+# imprest
 
-[![ci](https://github.com/theoddalex/agentmandate/actions/workflows/ci.yml/badge.svg)](https://github.com/theoddalex/agentmandate/actions/workflows/ci.yml)
+[![ci](https://github.com/theoddalex/imprest/actions/workflows/ci.yml/badge.svg)](https://github.com/theoddalex/imprest/actions/workflows/ci.yml)
 
 **Programmable spend limits and audit trails so AI agents can pay for things
 without risking the wallet.**
 
 AI agents are probabilistic — they can be prompt-injected, loop, or simply
 choose the wrong tool. The moment an agent can move money, one bad decision is
-irreversible. `agentmandate` is the guardrail layer between an agent and an
+irreversible. `imprest` is the guardrail layer between an agent and an
 Ethereum wallet: every payment the agent requests is checked against a policy
 it **cannot override**, and every attempt is logged.
 
 Think *corporate-card controls (Ramp/Brex) or Stripe Radar — but for agents*.
 The model in one line: **give your agent an allowance, not your keys.**
 
+> **Why "imprest"?** The [imprest system](https://en.wikipedia.org/wiki/Imprest_system)
+> is the centuries-old accounting control behind petty cash: a fixed fund is
+> entrusted to a spender, every draw is documented, and the fund is replenished
+> only after the records are audited. That is precisely what this server
+> implements — for AI agents.
+
 ## Quick start
 
 ```bash
-pip install git+https://github.com/theoddalex/agentmandate.git
+pip install git+https://github.com/theoddalex/imprest.git
 
-agentmandate init     # the one setup ceremony:
+imprest init     # the one setup ceremony:
                       #   ✓ policy.yaml — your agent's limits (edit them)
                       #   ✓ a dedicated wallet, generated locally from OS entropy
                       #   → prints the address to fund
-agentmandate status   # balances, gas headroom, active limits, sends switch
+imprest status   # balances, gas headroom, active limits, sends switch
 ```
 
 Then point any MCP client (Claude Desktop, Cursor, a LangChain agent — see
@@ -31,12 +37,12 @@ Then point any MCP client (Claude Desktop, Cursor, a LangChain agent — see
 nothing else:
 
 ```json
-{"agentmandate": {"transport": "stdio", "command": "agentmandate"}}
+{"imprest": {"transport": "stdio", "command": "imprest"}}
 ```
 
 Defaults are safe by construction: **Base Sepolia testnet, sends OFF** until you
 explicitly set `ENABLE_SENDS=true`. On testnets you may even skip `init` — a
-throwaway wallet auto-creates on first use. On **mainnet** chains agentmandate
+throwaway wallet auto-creates on first use. On **mainnet** chains imprest
 refuses to create a key silently: real-money wallets only come into existence
 when a human runs `init`.
 
@@ -47,7 +53,7 @@ for the agent; you fund it with only what the agent may spend, and top it up
 like a prepaid card. That makes the maximum possible loss the card balance —
 a physics-level cap that holds even if every software check failed. The policy
 engine is the soft limit; the balance is the hard one. Your real wallet
-(hardware, exchange, MetaMask) never touches agentmandate at all.
+(hardware, exchange, MetaMask) never touches imprest at all.
 
 ## How it works
 
@@ -56,7 +62,7 @@ agent: "pay 10 USDC to 0xabc… for the data API"
    │
    │  MCP tool call: request_payment(…, asset="USDC")
    ▼
-┌────────────────────── agentmandate ──────────────────────┐
+┌────────────────────── imprest ──────────────────────┐
 │ policy engine:  per-tx cap · hourly/daily budgets        │
 │ allow/denylist · rate limit · approval threshold         │
 └────────┬───────────────────┬────────────────────┬────────┘
@@ -78,7 +84,7 @@ any real ETH transfer attempt looks anomalous and gets denied or escalated.
 **The allowance ledger — the part nothing else has.** Agents can also
 `request_approval` (a guarded ERC-20 `approve()`): always an exact amount,
 never unlimited — the vector behind most token drains. Granted allowances
-outlive every budget window, so agentmandate tracks them as **standing
+outlive every budget window, so imprest tracks them as **standing
 liabilities**: the *total* live across all spenders is capped
 (`max_outstanding_allowance`), and `approve(spender, 0)` revokes to free the
 cap. Rolling budgets alone can't see this risk; the ledger closes it.
@@ -88,7 +94,7 @@ who approves or rejects (`resolve_approval`) — and hard limits are re-checked
 at approval time, so a human "yes" can't bust a budget.
 
 **x402 — pay-per-request APIs.** Agents can also buy paid HTTP resources with
-`pay_x402(url, max_amount)`: agentmandate does the [x402](https://docs.cdp.coinbase.com/x402/welcome)
+`pay_x402(url, max_amount)`: imprest does the [x402](https://docs.cdp.coinbase.com/x402/welcome)
 handshake (`402 Payment Required` → price quote), runs the quoted price through
 the **same policy pipeline** — caps, budgets, allowlist, approval queue — and
 only on ALLOW signs an EIP-3009 authorization for *exactly* the quoted amount
@@ -110,7 +116,7 @@ The **MCP server is the product**; agents are just clients of it.
   cost is bounded at `gas_limit × ceiling`, always.
 - **Broadcast is not success.** Every send waits for the receipt; reverts and
   timeouts fail the audit row. "Executed" means *mined with status 1*.
-- **The policy engine is pure logic** (`src/agentmandate/services/policy.py`)
+- **The policy engine is pure logic** (`src/imprest/services/policy.py`)
   — no I/O — so it is exhaustively unit-tested. The code guarding money is the
   code under the most tests (171 across the engine, auth, audit, ERC-20,
   approvals, the allowance ledger, x402, the chain rails, and the CLI).
@@ -126,7 +132,7 @@ The wallet owner runs the server; agents connect as clients and set nothing.
 `AGENT_ID`, the OS is the auth boundary:
 
 ```json
-{"agentmandate": {"transport": "stdio", "command": "agentmandate"}}
+{"imprest": {"transport": "stdio", "command": "imprest"}}
 ```
 
 **Hosted (HTTP)** — one server for the whole org; developers get a URL and an
@@ -135,14 +141,14 @@ mean anyone who can reach it can spend the budget):
 
 ```bash
 TRANSPORT=streamable-http \
-AGENTMANDATE_API_KEYS='sk-supp-…:support-bot,sk-proc-…:procurement' agentmandate
+IMPREST_API_KEYS='sk-supp-…:support-bot,sk-proc-…:procurement' imprest
 # or
-docker build -t agentmandate . && docker run -p 8000:8000 \
-  -e AGENTMANDATE_API_KEYS='…' -v $(pwd)/policy.yaml:/app/policy.yaml agentmandate
+docker build -t imprest . && docker run -p 8000:8000 \
+  -e IMPREST_API_KEYS='…' -v $(pwd)/policy.yaml:/app/policy.yaml imprest
 ```
 
 ```json
-{"agentmandate": {"transport": "streamable_http",
+{"imprest": {"transport": "streamable_http",
               "url": "http://payments.internal:8000/mcp",
               "headers": {"Authorization": "Bearer sk-supp-…"}}}
 ```
@@ -153,7 +159,7 @@ for `support-bot` and allowed for `procurement` — identity decides.
 Unauthenticated requests get a 401 before any tool runs.
 
 For the approval flow in hosted mode, also set
-`AGENTMANDATE_ADMIN_KEYS='sk-admin-…:ops'` — a human with an admin key can
+`IMPREST_ADMIN_KEYS='sk-admin-…:ops'` — a human with an admin key can
 `list_pending_approvals` / `resolve_approval`; agents (regular keys) cannot, so
 no agent signs off its own payment. Over stdio the local operator is the admin.
 
@@ -170,7 +176,7 @@ no agent signs off its own payment. Over stdio the local operator is the admin.
 and sub-cent gas. The sequence:
 
 ```bash
-CHAIN_ID=8453 RPC_URL=https://mainnet.base.org agentmandate init
+CHAIN_ID=8453 RPC_URL=https://mainnet.base.org imprest init
 ```
 
 1. `init` prints the funding address. Send it a small USDC float and a few
@@ -182,7 +188,7 @@ CHAIN_ID=8453 RPC_URL=https://mainnet.base.org agentmandate init
    rule on (one payment, one ruling; the address is not remembered) instead
    of being denied outright. Every other limit still applies first, so an
    over-cap request to a stranger dies on the cap, never reaching the queue.
-3. Check the card: `agentmandate status`.
+3. Check the card: `imprest status`.
 4. Flip `ENABLE_SENDS=true` **last**.
 
 Treat the wallet as a hot-wallet float (see limitations below): it should never
@@ -192,8 +198,8 @@ hold more than you'd load onto a gift card.
 
 ```
 main.py                          # repo-root shim (python main.py)
-src/agentmandate/
-├── main.py                      # console entrypoint (`agentmandate`)
+src/imprest/
+├── main.py                      # console entrypoint (`imprest`)
 ├── cli.py                       # operator CLI: init (the ceremony) + status
 ├── application.py               # app factory: create_application()
 ├── api/payments.py              # MCP tools (transport)
@@ -216,7 +222,7 @@ examples/agent-shop/             # complete solo-dev setup: agent + operator
 ## Developing
 
 ```bash
-git clone https://github.com/theoddalex/agentmandate && cd agentmandate
+git clone https://github.com/theoddalex/imprest && cd imprest
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[demo,dev]"
 cp .env.example .env
@@ -255,7 +261,7 @@ locally by `make security`:
   API key in a commit fails the build), Dockerfile misconfig, and the built
   image (base OS + installed packages)
 
-All findings gate at HIGH/CRITICAL. agentmandate deploys no custom smart
+All findings gate at HIGH/CRITICAL. imprest deploys no custom smart
 contracts, so the risk surface is the application itself — these checks cover
 it; an external review is still the gate before serious funds.
 
@@ -270,8 +276,8 @@ These are deliberate boundaries of the current design.
   model itself.
 - **The allowance ledger is conservative and off-chain.** It assumes the full
   last-approved amount to each spender is still live (the real liability can
-  only be *lower* than the cap), and it reconstructs state from agentmandate's
-  own audit log: allowances granted outside agentmandate are invisible to it.
+  only be *lower* than the cap), and it reconstructs state from imprest's
+  own audit log: allowances granted outside imprest are invisible to it.
   Start from a wallet with no pre-existing approvals, or revoke them first.
 - **Rate limiting counts only allowed spends.** Denied and `needs_approval`
   attempts don't count toward `rate_limit_per_minute`, and the pending-approval
@@ -299,7 +305,7 @@ These are deliberate boundaries of the current design.
 - **Abuse limits.** Count all attempts toward the rate limit; bound, paginate,
   and expire the pending-approval queue; retain/rotate the audit log.
 - **Non-custodial hosted control plane.** Split verdict from signing so a
-  hosted agentmandate never holds customer keys: policy + audit + dashboard in
+  hosted imprest never holds customer keys: policy + audit + dashboard in
   the cloud, a client-side signer executing only server-issued, single-use
   vouchers — and, longer term, ERC-4337 session keys / spend permissions so the
   chain itself enforces the limits.

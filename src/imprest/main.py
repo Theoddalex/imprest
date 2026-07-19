@@ -1,15 +1,15 @@
-"""Console entrypoint — `agentmandate` on the command line (or `uvx agentmandate`).
+"""Console entrypoint — `imprest` on the command line (or `uvx imprest`).
 
 Subcommands (operator CLI, see cli.py):
-  agentmandate init      create policy.yaml + the agent's wallet, print the
+  imprest init      create policy.yaml + the agent's wallet, print the
                          funding address (the onboarding ceremony)
-  agentmandate status    wallet, balances, policy limits, sends switch
+  imprest status    wallet, balances, policy limits, sends switch
 
 With no subcommand the MCP server runs; transport comes from settings/.env:
   TRANSPORT=stdio            local: each MCP client spawns its own server;
                              the OS is the auth boundary, identity = AGENT_ID
   TRANSPORT=streamable-http  hosted: one server at http://HOST:PORT/mcp.
-                             Requires AGENTMANDATE_API_KEYS ("key:agent-id,...");
+                             Requires IMPREST_API_KEYS ("key:agent-id,...");
                              refuses to start without them unless
                              ALLOW_ANONYMOUS=true is set explicitly.
 """
@@ -17,10 +17,10 @@ With no subcommand the MCP server runs; transport comes from settings/.env:
 import logging
 import sys
 
-from agentmandate.application import create_application
-from agentmandate.cli import run_command
-from agentmandate.configs.base import settings
-from agentmandate.services.auth import (
+from imprest.application import create_application
+from imprest.cli import run_command
+from imprest.configs.base import settings
+from imprest.services.auth import (
     AuthMiddleware,
     current_agent_id,
     current_is_admin,
@@ -35,7 +35,7 @@ def main() -> None:
         return
 
     # Logs go to STDERR — stdout is the MCP protocol channel over stdio, so
-    # writing logs there would corrupt it. This lights up the agentmandate.* loggers.
+    # writing logs there would corrupt it. This lights up the imprest.* loggers.
     logging.basicConfig(
         level=logging.INFO,
         stream=sys.stderr,
@@ -53,22 +53,22 @@ def main() -> None:
         return
 
     # --- hosted mode ---
-    api_keys = parse_api_keys(settings.agentmandate_api_keys)
-    admin_keys = parse_api_keys(settings.agentmandate_admin_keys)
+    api_keys = parse_api_keys(settings.imprest_api_keys)
+    admin_keys = parse_api_keys(settings.imprest_admin_keys)
 
     overlap = set(api_keys) & set(admin_keys)
     if overlap:
         sys.exit(
-            "agentmandate: the same key appears in both AGENTMANDATE_API_KEYS and "
-            "AGENTMANDATE_ADMIN_KEYS. Keys must be disjoint — a shared key resolves to "
+            "imprest: the same key appears in both IMPREST_API_KEYS and "
+            "IMPREST_ADMIN_KEYS. Keys must be disjoint — a shared key resolves to "
             "the non-admin agent identity, silently stripping approval rights. "
             "Give operators their own keys."
         )
     if not api_keys and not settings.allow_anonymous:
         sys.exit(
-            "agentmandate: refusing to serve HTTP without authentication.\n"
+            "imprest: refusing to serve HTTP without authentication.\n"
             "This server fronts a wallet — an open endpoint means anyone who can\n"
-            "reach it can spend the budget. Set AGENTMANDATE_API_KEYS='<key>:<agent-id>,...'\n"
+            "reach it can spend the budget. Set IMPREST_API_KEYS='<key>:<agent-id>,...'\n"
             "or, for local experiments only, ALLOW_ANONYMOUS=true."
         )
 
