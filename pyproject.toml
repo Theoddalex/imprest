@@ -9,7 +9,7 @@ description = "Programmable spend limits and audit trails so AI agents can pay f
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-authors = [{ name = "Alex Kovtonyuk" }]
+authors = [{ name = "Alex Kovtonyuk", email = "alexkobt3@gmail.com" }]
 keywords = ["mcp", "ai-agents", "payments", "ethereum", "spend-control", "guardrails"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -43,6 +43,8 @@ imprest = "imprest.main:main"
 
 [project.urls]
 Homepage = "https://github.com/theoddalex/imprest"
+Repository = "https://github.com/theoddalex/imprest"
+Issues = "https://github.com/theoddalex/imprest/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
